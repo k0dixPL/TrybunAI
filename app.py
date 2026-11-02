@@ -12,7 +12,12 @@ from pathlib import Path
 
 import webview
 
+from trybun import __version__
 from trybun.core import Session
+
+
+def window_title(project_name):
+    return f"TrybunAI {__version__} · {project_name}"
 
 
 def base_dir() -> Path:
@@ -116,7 +121,7 @@ class Api:
             return {"ok": False, "cancelled": True}
         result = self._session.set_project(picked[0])
         if result["ok"]:
-            self._window.set_title(f"TrybunAI · {self._session.project.name}")
+            self._window.set_title(window_title(self._session.project.name))
         return result
 
     def open_link(self, url):
@@ -130,7 +135,7 @@ def main():
     api = Api(session)
     html = resource("ui/index.html").read_text(encoding="utf-8")
     window = webview.create_window(
-        f"TrybunAI · {session.project.name}", html=html, js_api=api,
+        window_title(session.project.name), html=html, js_api=api,
         width=1100, height=820, min_size=(640, 480), background_color="#14161a",
     )
     api._window = window

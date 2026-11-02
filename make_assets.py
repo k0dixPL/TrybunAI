@@ -1,10 +1,15 @@
-"""Builds the exe icon and the in-app logo from the source PNG."""
+"""Builds the in-app logo and the exe icon from their source PNGs.
+
+The icon source (assets/icon-source.png) is drawn by draw_icon.py; rerun that script after
+changing the icon design.
+"""
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).parent
-SOURCE = ROOT / "logoQ-przezroczyste.png"
+LOGO_SOURCE = ROOT / "logoQ-przezroczyste.png"
+ICON_SOURCE = ROOT / "assets" / "icon-source.png"
 ICON_SIZES = (256, 128, 64, 48, 32, 24, 16)
 
 
@@ -22,10 +27,10 @@ def resized(image, size):
 
 
 def main():
-    logo = square(Image.open(SOURCE).convert("RGBA"))
-    (ROOT / "assets").mkdir(exist_ok=True)
+    logo = square(Image.open(LOGO_SOURCE).convert("RGBA"))
     resized(logo, 192).save(ROOT / "ui" / "logo.png", optimize=True)
-    frames = [resized(logo, size) for size in ICON_SIZES]
+    icon = square(Image.open(ICON_SOURCE).convert("RGBA"))
+    frames = [resized(icon, size) for size in ICON_SIZES]
     frames[0].save(ROOT / "assets" / "icon.ico", format="ICO", append_images=frames[1:],
                    sizes=[(s, s) for s in ICON_SIZES])
 
