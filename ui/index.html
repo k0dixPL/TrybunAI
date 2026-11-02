@@ -88,6 +88,16 @@ dialog legend{color:var(--dim);font-size:13px;padding:0 5px}
 dialog fieldset label{justify-content:flex-start;margin:5px 0}
 dialog small{color:var(--dim);display:block;margin-top:9px}
 dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
+#dlg{width:470px;max-height:90vh}
+#limits .acct{margin:8px 0 10px}
+#limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
+#limits .win{margin:5px 0 0;font-size:12.5px}
+#limits .win .top{display:flex;justify-content:space-between;gap:10px}
+#limits .barl{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:3px}
+#limits .barl i{display:block;height:100%;background:var(--codex)}
+#limits .barl i.mid{background:var(--haiku)}#limits .barl i.high{background:var(--danger)}
+#limits small{margin-top:3px}
+#limitsrefresh{margin:2px 0 8px;font-size:12.5px}
 #remotebtn.connecting{border-color:var(--haiku);color:var(--haiku)}
 #remotebtn.connected{border-color:var(--codex);color:var(--codex)}
 #toast{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:#4b2326;border:1px solid var(--danger);padding:6px 14px;border-radius:8px;display:none;max-width:80%;z-index:3}
@@ -142,6 +152,10 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
   <div id="models"></div>
   <small>Puste pole modelu oznacza domyślny model danego CLI. Ustawienia są zapisywane w folderze projektu.</small>
+  <fieldset id="limitsbox"><legend>Plany i limity</legend>
+    <div id="limits" role="status"></div>
+    <button id="limitsrefresh" type="button">Odśwież</button>
+  </fieldset>
   <menu><button id="dlgok" value="ok">Zapisz</button></menu>
 </form></dialog>
 <script>
@@ -406,6 +420,43 @@ function drawRemote() {
   $("remotetoggle").textContent = on ? "Wyłącz" : "Włącz";
 }
 
+const when = sec => new Date(sec * 1000).toLocaleString("pl-PL",
+  {weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"});
+async function drawLimits() {
+  const box = $("limits"), btn = $("limitsrefresh");
+  box.textContent = "Sprawdzam…"; btn.disabled = true;
+  let accounts = [];
+  try { accounts = await api.limits(); } catch (e) { box.textContent = "Nie udało się sprawdzić limitów."; btn.disabled = false; return; }
+  box.replaceChildren();
+  const now = Date.now() / 1000;
+  for (const a of accounts) {
+    const d = document.createElement("div"); d.className = "acct";
+    const head = document.createElement("b"); head.textContent = a.label; d.append(head);
+    if (a.plan) { const p = document.createElement("span"); p.className = "plan"; p.textContent = "plan: " + a.plan; d.append(p); }
+    for (const w of a.windows) {
+      const row = document.createElement("div"); row.className = "win";
+      const top = document.createElement("div"); top.className = "top";
+      const name = document.createElement("span"), info = document.createElement("span");
+      const renewed = w.resets_at && w.resets_at < now;
+      name.textContent = w.label;
+      info.textContent = renewed ? "odnowiony od ostatniego sprawdzenia"
+        : `zużyto ${w.used}%` + (w.resets_at ? ` · odnowienie ${when(w.resets_at)}` : "");
+      top.append(name, info);
+      const bar = document.createElement("div"); bar.className = "barl";
+      const fill = document.createElement("i"); const used = renewed ? 0 : w.used;
+      fill.style.width = used + "%"; fill.className = used >= 90 ? "high" : used >= 70 ? "mid" : "";
+      bar.append(fill); row.append(top, bar); d.append(row);
+    }
+    const notes = [];
+    if (a.checked_at && now - a.checked_at > 120) notes.push("stan z " + when(a.checked_at));
+    if (a.note) notes.push(a.note);
+    if (notes.length) { const s = document.createElement("small"); s.textContent = notes.join(" · "); d.append(s); }
+    box.append(d);
+  }
+  if (!accounts.length) box.textContent = "Brak zainstalowanych CLI.";
+  btn.disabled = false;
+}
+
 function fillSettings() {
   const eng = $("engine"); eng.replaceChildren();
   for (const [id, a] of shown()) {
@@ -487,7 +538,8 @@ window.addEventListener("pywebviewready", async () => {
     if (!r.ok) return addLine($("setuplog"), "err", r.error);
     $("setupgo").disabled = true; $("setupclose").disabled = true;
   };
-  $("settings").onclick = () => { fillSettings(); $("dlg").showModal(); };
+  $("settings").onclick = () => { fillSettings(); $("dlg").showModal(); drawLimits(); };
+  $("limitsrefresh").onclick = drawLimits;
   $("dlg").addEventListener("close", async () => {
     const models = {};
     document.querySelectorAll("#models input").forEach(i => { if (i.value.trim()) models[i.dataset.agent] = i.value.trim(); });

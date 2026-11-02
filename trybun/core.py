@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import setup
+from . import limits, setup
 from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
                      is_safe_arg, parse_event, session_name, stdin_payload)
 from .remote import RemoteControl
@@ -440,6 +440,11 @@ class Session:
     def remote_stop(self):
         self._remote.stop()
 
+    def limits(self):
+        with self._lock:
+            binaries = dict(self._binaries)
+        return limits.collect(binaries)
+
     # ---- installing the CLIs ---------------------------------------------
     def setup_status(self):
         return setup.status()
@@ -653,6 +658,8 @@ class Session:
                 self._text(result, "\n\n", run_id)
         elif kind == "text":
             self._text(result, value, run_id)
+        elif kind == "limits":
+            limits.record_claude(value)
         elif kind in ("activity", "warn") and value:
             self.emit({"t": "activity", "id": run_id, "text": value})
 

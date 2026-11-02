@@ -82,6 +82,9 @@ class Api:
     def start_setup(self):
         return self._session.start_setup()
 
+    def limits(self):
+        return self._session.limits()
+
     def pick_attachments(self):
         picked = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
         return [self._session.attach_file(path) for path in picked or []]

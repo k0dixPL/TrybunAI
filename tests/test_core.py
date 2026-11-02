@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from trybun import core, setup  # noqa: E402
+from trybun import core, limits, setup  # noqa: E402
 from trybun.agents import (build_command, build_remote_command, parse_event, session_name,  # noqa: E402
                            stdin_payload)
 from trybun.remote import RemoteControl  # noqa: E402
@@ -186,6 +186,33 @@ class Pure(unittest.TestCase):
         self.assertEqual(ev({"event": "result", "result": {"status": "SUCCESS", "response": "ok"}}), [])
         self.assertEqual(ev({"event": "result", "result": {"status": "ERROR", "error": "brak limitu"}}),
                          [("fatal", "brak limitu")])
+
+    def test_limits_from_each_cli(self):
+        usage = ("Gemini Models\tWeekly Limit Remaining\t91%\t2026-11-09T19:43:39Z\n"
+                 "Claude and GPT models\tWeekly Limit Remaining\t100%\t2026-11-09T19:57:02Z\n")
+        wins = limits.parse_agy_usage(usage)
+        self.assertEqual([(w["label"], w["used"]) for w in wins],
+                         [("Modele Gemini, tydzień", 9), ("Modele Claude i GPT, tydzień", 0)])
+        with tempfile.TemporaryDirectory() as home:
+            log = Path(home, ".codex", "sessions", "2026", "11", "02", "rollout-x.jsonl")
+            log.parent.mkdir(parents=True)
+            entry = {"timestamp": "2026-11-02T19:11:21.595Z", "payload": {"type": "token_count", "rate_limits": {
+                "primary": {"used_percent": 9.0, "window_minutes": 43200, "resets_at": 1796151314},
+                "secondary": None, "plan_type": "go"}}}
+            log.write_text('{"payload":{}}\n' + json.dumps(entry) + "\n", encoding="utf-8")
+            got = limits.codex(home)
+        self.assertEqual(got["plan"], "Go")
+        self.assertEqual(got["windows"], [{"label": "30 dni", "used": 9, "resets_at": 1796151314}])
+        info = {"unifiedWindows": {"five_hour": {"utilization": 0.24, "resetsAt": 1},
+                                   "seven_day": {"utilization": 0.28, "resetsAt": 2}}}
+        self.assertEqual(parse_event("haiku", {"type": "rate_limit_event", "rate_limit_info": info}),
+                         [("limits", info)])
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(limits, "_STORE", Path(tmp, "l.json")), \
+                mock.patch.object(limits, "_run", lambda cmd, timeout=30: (0, '{"subscriptionType": "pro"}')):
+            limits.record_claude(info)
+            got = limits.claude("claude")
+        self.assertEqual(got["plan"], "Pro")
+        self.assertEqual([(w["label"], w["used"]) for w in got["windows"]], [("5 godzin", 24), ("tydzień", 28)])
 
     def test_claude_sessions_get_fixed_name(self):
         with mock.patch("platform.node", return_value="MOJ PC"):

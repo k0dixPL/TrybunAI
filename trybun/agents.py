@@ -165,7 +165,7 @@ def _tool_summary(name, params):
 def parse_event(agent_id, obj):
     """Translate one JSON line into (kind, value) tuples.
 
-    Kinds: session, text, break (new assistant message), activity, warn, fatal.
+    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits.
     """
     if not isinstance(obj, dict):
         return []
@@ -177,6 +177,8 @@ def _parse_claude(o):
     kind = o.get("type")
     if kind == "system" and o.get("subtype") == "init":
         return [("session", o.get("session_id"))]
+    if kind == "rate_limit_event":
+        return [("limits", o.get("rate_limit_info"))]
     if o.get("parent_tool_use_id"):
         return []  # subagent chatter stays out of the transcript
     if kind == "stream_event":
