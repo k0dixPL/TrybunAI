@@ -1,0 +1,10 @@
+.venv/
+build/
+dist/
+__pycache__/
+*.spec
+.trybunai/
+*.exe
+.claude/settings.local.json
+_ui check/
+_name check/

@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval'; img-src data:">
+<title>TrybunAI</title>
+<style>
+:root{--bg:#14161a;--panel:#1c1f25;--panel2:#252932;--line:#323742;--text:#e6e8ec;--dim:#969cab;
+--claude:#e08a5f;--codex:#4fbf8f;--gemini:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--danger:#e5676b}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14.5px/1.55 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:5px 11px;cursor:pointer}
+button:hover:not(:disabled){border-color:#596172}
+button:disabled{opacity:.45;cursor:default}
+select,input[type=text]{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:5px 8px}
+:focus-visible{outline:2px solid #7a8499;outline-offset:1px}
+header{display:flex;gap:9px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+header b{font-size:15px}
+header img{height:30px;width:30px}
+.empty img{display:block;width:160px;height:160px;margin:0 auto 14px}
+#project{flex:1;min-width:0;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dim);background:none;border-color:transparent}
+#log{flex:1;overflow-y:auto;padding:18px 14px}
+.wrap{max-width:860px;margin:0 auto}
+.empty{color:var(--dim);text-align:center;margin-top:13vh}
+.empty code{color:var(--text)}
+.msg{margin-bottom:15px;padding:9px 13px;border-radius:9px;background:var(--panel);border-left:3px solid var(--line);overflow-wrap:anywhere}
+.msg.user{background:var(--panel2)}
+.msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.gemini{border-left-color:var(--gemini)}.msg.haiku{border-left-color:var(--haiku)}
+.who{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin-bottom:3px}
+.who strong.claude{color:var(--claude)}.who strong.codex{color:var(--codex)}.who strong.gemini{color:var(--gemini)}.who strong.haiku{color:var(--haiku)}
+.who .sp{flex:1}
+.who button{padding:0 8px;font-size:12px}
+.body>:first-child{margin-top:0}.body>:last-child{margin-bottom:0}
+.body p{margin:.5em 0;white-space:pre-wrap}
+.body h1,.body h2,.body h3,.body h4{margin:.8em 0 .3em;font-size:1.08em}
+.body ul,.body ol{margin:.4em 0;padding-left:1.5em}
+.body blockquote{margin:.5em 0;padding-left:10px;border-left:3px solid var(--line);color:var(--dim)}
+.body a{color:var(--gemini)}
+.body code{background:#0f1114;padding:1px 4px;border-radius:4px;font:13px Consolas,monospace}
+.code{position:relative;margin:.6em 0}
+.code pre{background:#0f1114;padding:10px 12px;border-radius:7px;overflow-x:auto;margin:0}
+.code pre code{padding:0;white-space:pre}
+.code button{position:absolute;top:5px;right:5px;padding:0 7px;font-size:12px}
+.tbl{overflow-x:auto}.body table{border-collapse:collapse;margin:.5em 0}.body td,.body th{border:1px solid var(--line);padding:3px 8px}
+.err{color:var(--danger);white-space:pre-wrap;font-size:13.5px}
+.note{color:var(--dim);font-size:12.5px;font-style:italic}
+.acts{font:12px Consolas,monospace;color:var(--dim);margin-top:5px}
+.acts div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.typing::after{content:"pracuje…";color:var(--dim);font-size:13px;animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.35}}
+footer{background:var(--panel);border-top:1px solid var(--line);padding:9px 14px 12px}
+#bar{display:none;gap:9px;align-items:center;font-size:13px;color:var(--prompter);margin-bottom:7px}
+#bar.on{display:flex}
+#bar span{flex:1}
+#bar button{padding:1px 9px}
+#chips{display:flex;gap:6px;margin-bottom:7px;align-items:center}
+.chip{padding:2px 12px;border-radius:15px;font-size:13px}
+.chip.on.claude{background:var(--claude);border-color:var(--claude);color:#14161a}
+.chip.on.codex{background:var(--codex);border-color:var(--codex);color:#14161a}
+.chip.on.gemini{background:var(--gemini);border-color:var(--gemini);color:#14161a}
+.chip.on.haiku{background:var(--haiku);border-color:var(--haiku);color:#14161a}
+#setuprows div{display:flex;justify-content:space-between;margin:5px 0}
+#setuprows .bad{color:var(--danger)}#setuprows .good{color:var(--codex)}
+#setuplog{background:#0f1114;border-radius:7px;padding:8px 10px;margin-top:10px;max-height:190px;overflow-y:auto;font-size:13px;white-space:pre-wrap}
+#setuplog:empty{display:none}
+.gallery{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.gallery img{max-width:min(100%,420px);max-height:320px;border-radius:7px;border:1px solid var(--line);cursor:zoom-in}
+.file{font-size:12.5px;color:var(--dim);margin-top:5px}
+#files{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
+#files:empty{display:none}
+#files button{font-size:12.5px;padding:1px 9px}
+#attach{height:42px}
+#hint{color:var(--dim);font-size:12px;margin-left:auto}
+#row{display:flex;gap:8px;align-items:flex-end}
+textarea{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;resize:none;min-height:42px;max-height:40vh}
+#refine{border-color:var(--prompter);color:var(--prompter);height:42px}
+#sendbtn{background:#3d6fd1;border-color:#3d6fd1;color:#fff;height:42px;padding:0 18px}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:11px;width:430px}
+dialog::backdrop{background:#0009}
+dialog h3{margin:0 0 12px}
+dialog label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:9px 0}
+dialog input[type=text]{width:220px}
+dialog fieldset{border:1px solid var(--line);border-radius:7px;margin:10px 0;padding:4px 10px}
+dialog legend{color:var(--dim);font-size:13px;padding:0 5px}
+dialog fieldset label{justify-content:flex-start;margin:5px 0}
+dialog small{color:var(--dim);display:block;margin-top:9px}
+dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
+#remotebtn.connecting{border-color:var(--haiku);color:var(--haiku)}
+#remotebtn.connected{border-color:var(--codex);color:var(--codex)}
+#toast{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:#4b2326;border:1px solid var(--danger);padding:6px 14px;border-radius:8px;display:none;max-width:80%;z-index:3}
+</style>
+</head>
+<body>
+<header>
+  <img class="logo" alt="" width="30" height="30">
+  <b>TrybunAI</b>
+  <button id="project" title="Zmień folder projektu"></button>
+  <label for="mode" id="modelabel" style="color:var(--dim);font-size:13px">Uprawnienia</label>
+  <select id="mode">
+    <option value="read">Tylko odczyt</option>
+    <option value="edit">Edycja plików</option>
+    <option value="full">Pełny dostęp</option>
+  </select>
+  <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
+  <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
+  <button id="settings">Ustawienia</button>
+  <button id="newchat">Nowa rozmowa</button>
+</header>
+<div id="toast" role="alert"></div>
+<main id="log"><div class="wrap" id="items"></div></main>
+<footer><div class="wrap">
+  <div id="bar"><span id="bartext"></span><button id="restore">Przywróć oryginał</button><button id="pstop">Zatrzymaj</button></div>
+  <div id="chips"><span id="hint">Enter: wyślij · Shift+Enter: nowa linia · Alt+P: prompter</span></div>
+  <div id="files"></div>
+  <div id="row">
+    <button id="attach" title="Załącz plik lub obraz (obraz możesz też wkleić przez Ctrl+V)">Załącz</button>
+    <textarea id="input" rows="1" placeholder="Napisz wiadomość albo: @codex …, @claude @gemini …, @wszyscy …, @haiku …"></textarea>
+    <button id="refine" title="Przepisz tekst na dobry prompt (Alt+P)">Prompter</button>
+    <button id="sendbtn">Wyślij</button>
+  </div>
+</div></footer>
+<dialog id="setupdlg">
+  <h3>Instalacja i logowanie</h3>
+  <div id="setuprows"></div>
+  <div id="setuplog" role="log"></div>
+  <small id="setupnote">Program zainstaluje brakujące CLI, a potem otworzy po kolei okna logowania. Następne okno pojawi się po zamknięciu poprzedniego.</small>
+  <menu style="gap:8px"><button id="setupclose" type="button">Zamknij</button><button id="setupgo" type="button">Zainstaluj i zaloguj brakujące</button></menu>
+</dialog>
+<dialog id="remotedlg">
+  <h3>Zdalne sterowanie Claude</h3>
+  <div id="remotestate" role="status"></div>
+  <div id="remoteerr" class="err"></div>
+  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
+  <menu style="gap:8px"><button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button><button id="remoteclose" type="button">Zamknij</button><button id="remotetoggle" type="button"></button></menu>
+</dialog>
+<dialog id="dlg"><form method="dialog">
+  <h3>Ustawienia</h3>
+  <label>Prompter używa <select id="engine"></select></label>
+  <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
+  <div id="models"></div>
+  <small>Puste pole modelu oznacza domyślny model danego CLI. Ustawienia są zapisywane w folderze projektu.</small>
+  <menu><button id="dlgok" value="ok">Zapisz</button></menu>
+</form></dialog>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let S = null, api = null, original = null, files = [], logoData = "";
+const runs = new Map();
+
+const esc = s => s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function inline(raw) {
+  // Everything is escaped before any tag is added, so model output cannot inject HTML.
+  const slots = [];
+  let s = raw.replace(/`([^`\n]+)`/g, (_, c) => { slots.push(`<code>${esc(c)}</code>`); return `\u0000${slots.length-1}\u0000`; });
+  s = esc(s);
+  s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[\s(])\*([^*\s][^*\n]*)\*/g, "$1<em>$2</em>");
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[+i]);
+}
+
+function markdown(src) {
+  const lines = src.split(/\r?\n/), out = [];
+  let i = 0;
+  const isBlockStart = l => /^(```|#{1,6}\s|\s*[-*+]\s|\s*\d+[.)]\s|>\s?|\|)/.test(l);
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) {
+      const code = [];
+      for (i++; i < lines.length && !/^```\s*$/.test(lines[i]); i++) code.push(lines[i]);
+      i++;
+      out.push(`<div class="code"><button type="button" data-copy>Kopiuj</button><pre><code>${esc(code.join("\n"))}</code></pre></div>`);
+    } else if (!l.trim()) { i++; }
+    else if (/^#{1,6}\s/.test(l)) {
+      const n = Math.min(l.match(/^#+/)[0].length, 4);
+      out.push(`<h${n}>${inline(l.replace(/^#+\s*/, ""))}</h${n}>`); i++;
+    } else if (/^\s*[-*+]\s/.test(l) || /^\s*\d+[.)]\s/.test(l)) {
+      const ordered = /^\s*\d/.test(l), items = [];
+      while (i < lines.length && /^\s*([-*+]|\d+[.)])\s/.test(lines[i])) {
+        items.push(`<li>${inline(lines[i].replace(/^\s*([-*+]|\d+[.)])\s+/, ""))}</li>`); i++;
+      }
+      const t = ordered ? "ol" : "ul";
+      out.push(`<${t}>${items.join("")}</${t}>`);
+    } else if (/^>\s?/.test(l)) {
+      const q = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) q.push(inline(lines[i++].replace(/^>\s?/, "")));
+      out.push(`<blockquote>${q.join("<br>")}</blockquote>`);
+    } else if (/^\|.*\|\s*$/.test(l) && /^\|[\s:|-]+\|\s*$/.test(lines[i+1] || "")) {
+      const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => inline(c.trim()));
+      const head = cells(l).map(c => `<th>${c}</th>`).join("");
+      const rows = [];
+      for (i += 2; i < lines.length && /^\|.*\|\s*$/.test(lines[i]); i++)
+        rows.push("<tr>" + cells(lines[i]).map(c => `<td>${c}</td>`).join("") + "</tr>");
+      out.push(`<div class="tbl"><table><tr>${head}</tr>${rows.join("")}</table></div>`);
+    } else {
+      const p = [l]; i++;
+      while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i])) p.push(lines[i++]);
+      out.push(`<p>${inline(p.join("\n"))}</p>`);
+    }
+  }
+  return out.join("");
+}
+
+const nearBottom = () => { const e = $("log"); return e.scrollHeight - e.scrollTop - e.clientHeight < 90; };
+const scrollDown = () => { const e = $("log"); e.scrollTop = e.scrollHeight; };
+
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.style.display = "block";
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 6000);
+}
+
+function bubble(cls, whoNode) {
+  const m = document.createElement("div"); m.className = "msg " + cls;
+  const w = document.createElement("div"); w.className = "who"; w.append(whoNode);
+  const b = document.createElement("div"); b.className = "body";
+  m.append(w, b); $("items").append(m);
+  document.querySelector(".empty")?.remove();
+  return {m, w, b};
+}
+function label(agent, turn) {
+  const s = document.createElement("strong");
+  s.className = agent; s.textContent = S.agents[agent].label + (turn ? " · " + turn : ""); return s;
+}
+function userBubble(msg) {
+  const span = document.createElement("span");
+  const names = msg.targets.map(t => S.agents[t].label).join(", ");
+  span.textContent = msg.debate ? `Ty → debata, ${msg.debate} rund(y): ${names} (tylko odczyt)` : "Ty → " + names;
+  const parts = bubble("user", span);
+  parts.b.innerHTML = markdown(msg.text);
+  addFiles(parts.b, msg.attachments);
+}
+const isImage = p => /\.(png|jpe?g|webp|gif|bmp)$/i.test(p);
+function addFiles(parent, list) {
+  if (!list || !list.length) return;
+  const g = document.createElement("div"); g.className = "gallery";
+  for (const p of list) {
+    if (!isImage(p)) { addLine(parent, "file", "Plik: " + p); continue; }
+    const img = document.createElement("img"); img.alt = p; img.title = p + " (kliknij, aby otworzyć)";
+    img.onclick = () => api.open_image(p);
+    g.append(img);
+    api.image_data(p).then(d => { if (d) img.src = d; else { img.remove(); addLine(parent, "file", "Brak pliku: " + p); } });
+  }
+  if (g.children.length) parent.append(g);
+}
+function drawFiles() {
+  $("files").replaceChildren(...files.map((f, i) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.textContent = f.name + " ✕"; b.title = "Usuń załącznik";
+    b.onclick = () => { files.splice(i, 1); drawFiles(); };
+    return b;
+  }));
+}
+function addAttachments(results) {
+  for (const r of results) { if (r.ok) files.push(r); else toast(r.error); }
+  drawFiles();
+}
+function drawMode() {
+  const id = S.settings.target;
+  $("mode").value = S.settings.modes[id] || "read";
+  $("modelabel").textContent = "Uprawnienia: " + S.agents[id].label;
+}
+function finish(parts, msg) {
+  parts.b.innerHTML = markdown(msg.text || "");
+  if (msg.status === "stopped") addLine(parts.b, "note", "Przerwano.");
+  if (msg.error) addLine(parts.b, "err", msg.error);
+  addFiles(parts.b, msg.images);
+}
+function addLine(parent, cls, text) {
+  const d = document.createElement("div"); d.className = cls; d.textContent = text; parent.append(d);
+}
+function render() {
+  $("items").replaceChildren();
+  $("project").textContent = S.project; $("project").title = "Zmień folder: " + S.project;
+  if (!S.messages.length) {
+    const e = document.createElement("div"); e.className = "empty";
+    e.innerHTML = '<img class="logo" alt="">' + "Wybierz model poniżej albo zacznij od <code>@codex</code>, <code>@claude @gemini</code>, <code>@wszyscy</code>.<br>Dyskusja między modelami: <code>@debata 3 @claude @codex temat</code>.<br>Przycisk Prompter przepisze Twój tekst na prompt, zanim go wyślesz.";
+    $("items").append(e);
+    showLogo();
+  }
+  for (const m of S.messages) {
+    if (m.role === "user") userBubble(m);
+    else finish(bubble(m.agent, label(m.agent, m.label)), m);
+  }
+  drawChips(); drawMode(); scrollDown();
+}
+function drawChips() {
+  document.querySelectorAll(".chip").forEach(c => c.remove());
+  const hint = $("hint");
+  for (const [id, a] of Object.entries(S.agents)) {
+    const c = document.createElement("button");
+    c.type = "button"; c.className = `chip ${id}` + (S.settings.target === id ? " on" : "");
+    c.textContent = a.label + (a.available ? "" : " (brak)"); c.disabled = !a.available;
+    c.setAttribute("aria-pressed", S.settings.target === id);
+    c.onclick = () => { S.settings.target = id; api.update_settings({target: id}); drawChips(); drawMode(); $("input").focus(); };
+    $("chips").insertBefore(c, hint);
+  }
+}
+
+window.onEvents = events => {
+  let stick = nearBottom();
+  for (const e of events) {
+    if (e.t === "message") { userBubble(e.message); stick = true; }
+    else if (e.t === "start") {
+      const parts = bubble(e.agent, label(e.agent, e.label));
+      const sp = document.createElement("span"); sp.className = "sp";
+      const st = document.createElement("button"); st.textContent = "Zatrzymaj"; st.onclick = () => api.stop(e.agent);
+      parts.w.append(sp, st);
+      const text = document.createElement("div"); text.className = "typing";
+      const acts = document.createElement("div"); acts.className = "acts";
+      parts.b.append(text, acts);
+      runs.set(e.id, {parts, st, text, acts, buf: ""});
+    } else if (e.t === "delta") {
+      const r = runs.get(e.id); if (!r) continue;
+      r.buf += e.text; r.text.innerHTML = markdown(r.buf);
+      r.text.classList.remove("typing");
+    } else if (e.t === "activity") {
+      const r = runs.get(e.id); if (!r) continue;
+      addLine(r.acts, "", "› " + e.text);
+      while (r.acts.children.length > 6) r.acts.firstChild.remove();
+    } else if (e.t === "end") {
+      const r = runs.get(e.id); if (!r) continue;
+      r.st.remove(); finish(r.parts, e.message); runs.delete(e.id);
+    } else if (e.t === "debate_end") {
+      addLine($("items"), "note", e.text);
+    } else if (e.t === "remote") {
+      S.remote = e; drawRemote();
+    } else if (e.t === "setup") {
+      addLine($("setuplog"), "", e.text); $("setuplog").scrollTop = $("setuplog").scrollHeight;
+    } else if (e.t === "setup_end") {
+      addLine($("setuplog"), "", e.ready ? "Wszystko gotowe." : "Nie wszystko się udało: szczegóły powyżej.");
+      $("setupclose").disabled = false;
+      refreshSetup();
+    } else if (e.t === "p_start") {
+      setPrompter(true, `Prompter (${S.agents[e.engine].label}) pracuje…`);
+    } else if (e.t === "p_end") {
+      if (e.ok) {
+        $("input").value = e.text; grow();
+        setPrompter(false, "Gotowy prompt jest w polu poniżej: popraw go, jeśli chcesz, i wyślij.");
+      } else {
+        setPrompter(false, null);
+        if (original !== null) $("input").value = original; original = null; grow();
+        if (e.error) toast("Prompter: " + e.error);
+      }
+      $("input").focus();
+    }
+  }
+  if (stick) scrollDown();
+};
+
+function setPrompter(working, text) {
+  $("input").disabled = working; $("refine").disabled = working; $("sendbtn").disabled = working;
+  $("pstop").hidden = !working; $("restore").hidden = working;
+  $("bar").classList.toggle("on", !!text);
+  $("bartext").textContent = text || "";
+}
+function grow() { const t = $("input"); t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
+
+async function send() {
+  const t = $("input"), text = t.value;
+  if (!text.trim()) return;
+  if (/^\s*@prompter\b/i.test(text)) { t.value = text.replace(/^\s*@prompter\b[\s,:]*/i, ""); return refine(); }
+  const r = await api.send(text, S.settings.target, files.map(f => f.path));
+  if (!r.ok) return toast(r.error);
+  files = []; drawFiles();
+  t.value = ""; original = null; setPrompter(false, null); grow();
+}
+async function refine() {
+  const text = $("input").value;
+  original = text;
+  const r = await api.refine(text, S.settings.target);
+  if (!r.ok) { original = null; toast(r.error); }
+}
+async function refreshSetup() {
+  const st = await api.setup_status();
+  const rows = Object.values(st).map(t => {
+    const d = document.createElement("div"), name = document.createElement("span"), state = document.createElement("span");
+    name.textContent = t.label;
+    const ok = t.installed && t.logged_in;
+    state.className = ok ? "good" : "bad";
+    state.textContent = ok ? "gotowy" : t.installed ? "niezalogowany" : "brak";
+    d.append(name, state); return d;
+  });
+  $("setuprows").replaceChildren(...rows);
+  $("setupgo").disabled = Object.values(st).every(t => t.installed && t.logged_in);
+  // Only the availability changes: redrawing the whole chat would drop running replies.
+  S = {...S, agents: (await api.snapshot()).agents}; drawChips();
+  return st;
+}
+function showLogo() {
+  document.querySelectorAll("img.logo").forEach(i => { i.src = logoData; });
+}
+async function reload() { S = await api.snapshot(); render(); drawRemote(); }
+function drawRemote() {
+  const r = S.remote, on = r.state !== "off";
+  $("remotebtn").className = r.state;
+  $("remotebtn").textContent = r.state === "connected" ? "Zdalnie: wł." : r.state === "connecting" ? "Zdalnie…" : "Zdalnie";
+  $("remotestate").textContent = {off: "Wyłączone.", connecting: "Łączenie…", connected: "Połączono. Otwórz aplikację Claude i napisz."}[r.state];
+  $("remoteerr").textContent = r.error || "";
+  $("remotelink").hidden = !r.url;
+  $("remotetoggle").textContent = on ? "Wyłącz" : "Włącz";
+}
+
+function fillSettings() {
+  const eng = $("engine"); eng.replaceChildren();
+  for (const [id, a] of Object.entries(S.agents)) {
+    const o = document.createElement("option"); o.value = id;
+    o.textContent = a.label + (a.available ? "" : " (brak)"); o.disabled = !a.available; eng.append(o);
+  }
+  eng.value = S.settings.prompter;
+  const crowd = $("everyone");
+  crowd.querySelectorAll("label").forEach(l => l.remove());
+  for (const [id, a] of Object.entries(S.agents)) {
+    const l = document.createElement("label"), c = document.createElement("input");
+    c.type = "checkbox"; c.dataset.agent = id; c.checked = S.settings.everyone.includes(id);
+    l.append(c, a.label + (a.available ? "" : " (brak)")); crowd.append(l);
+  }
+  const box = $("models"); box.replaceChildren();
+  for (const [id, a] of Object.entries(S.agents)) {
+    const l = document.createElement("label"); l.textContent = "Model: " + a.label;
+    const i = document.createElement("input"); i.type = "text"; i.dataset.agent = id;
+    i.value = S.settings.models[id] || ""; i.placeholder = id === "haiku" ? "haiku" : "domyślny"; l.append(i); box.append(l);
+  }
+}
+
+window.addEventListener("pywebviewready", async () => {
+  api = window.pywebview.api;
+  logoData = await api.logo();
+  showLogo();
+  $("sendbtn").onclick = send;
+  $("refine").onclick = refine;
+  $("pstop").onclick = () => api.stop("prompter");
+  $("restore").onclick = () => { if (original !== null) $("input").value = original; original = null; setPrompter(false, null); grow(); $("input").focus(); };
+  $("input").addEventListener("input", grow);
+  $("attach").onclick = async () => addAttachments(await api.pick_attachments());
+  $("input").addEventListener("paste", e => {
+    for (const item of e.clipboardData?.files || []) {
+      e.preventDefault();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const name = item.name || "wklejony.png";
+        addAttachments([await api.paste_attachment(name, reader.result.split(",")[1])]);
+      };
+      reader.readAsDataURL(item);
+    }
+  });
+  $("input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.altKey && e.code === "KeyP") { e.preventDefault(); if (!$("refine").disabled) refine(); }
+  });
+  $("mode").onchange = async e => {
+    if (e.target.value === "full" && !confirm("Pełny dostęp: ten model będzie wykonywać dowolne polecenia na tym komputerze bez pytania i bez piaskownicy. Włączyć?")) {
+      drawMode(); return;
+    }
+    S.settings.modes[S.settings.target] = e.target.value;
+    await api.update_settings({modes: S.settings.modes});
+  };
+  $("project").onclick = async () => {
+    const r = await api.choose_project();
+    if (r.ok) await reload(); else if (r.error) toast(r.error);
+  };
+  $("newchat").onclick = async () => {
+    if (!confirm("Zacząć nową rozmowę? Obecna zostanie zarchiwizowana w folderze .trybunai.")) return;
+    const r = await api.new_chat();
+    if (r.ok) await reload(); else toast(r.error);
+  };
+  $("remotebtn").onclick = () => $("remotedlg").showModal();
+  $("remoteclose").onclick = () => $("remotedlg").close();
+  $("remotelink").onclick = () => api.open_link(S.remote.url);
+  $("remotetoggle").onclick = async () => {
+    if (S.remote.state !== "off") return api.remote_stop();
+    const r = await api.remote_start();
+    if (!r.ok) $("remoteerr").textContent = r.error;
+  };
+  $("setupbtn").onclick = () => { refreshSetup(); $("setupdlg").showModal(); };
+  $("setupclose").onclick = () => $("setupdlg").close();
+  $("setupgo").onclick = async () => {
+    $("setuplog").replaceChildren();
+    const r = await api.start_setup();
+    if (!r.ok) return addLine($("setuplog"), "err", r.error);
+    $("setupgo").disabled = true; $("setupclose").disabled = true;
+  };
+  $("settings").onclick = () => { fillSettings(); $("dlg").showModal(); };
+  $("dlg").addEventListener("close", async () => {
+    const models = {};
+    document.querySelectorAll("#models input").forEach(i => { if (i.value.trim()) models[i.dataset.agent] = i.value.trim(); });
+    const everyone = [...document.querySelectorAll("#everyone input:checked")].map(c => c.dataset.agent);
+    const changes = {prompter: $("engine").value, models, everyone};
+    const r = await api.update_settings(changes);
+    if (r.ok) Object.assign(S.settings, changes); else toast(r.error);
+  });
+  $("log").addEventListener("click", e => {
+    const a = e.target.closest("a");
+    if (a) { e.preventDefault(); api.open_link(a.getAttribute("href")); return; }
+    const c = e.target.closest("[data-copy]");
+    if (c) {
+      const ta = document.createElement("textarea");
+      ta.value = c.parentElement.querySelector("code").textContent;
+      document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove();
+      c.textContent = "Skopiowano"; setTimeout(() => c.textContent = "Kopiuj", 1200);
+    }
+  });
+  setPrompter(false, null);
+  await reload();
+  $("input").focus();
+  // A new laptop: show what is missing straight away.
+  if (Object.values(S.agents).some(a => !a.available)) $("setupbtn").click();
+});
+</script>
+</body>
+</html>
