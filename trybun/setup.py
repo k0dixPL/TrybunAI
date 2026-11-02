@@ -31,7 +31,7 @@ TOOLS = {
               "login": ["login"]},
     "gemini": {"label": "Gemini CLI", "needs_node": True, "install": [_npm("@google/gemini-cli")],
                "login": [],
-               "login_hint": "Gemini: wybierz logowanie w oknie, a po zalogowaniu zamknij to okno."},
+               "login_hint": "Gemini: wybierz logowanie w oknie. Okno zamknie się samo po zalogowaniu."},
 }
 
 
@@ -100,9 +100,22 @@ def _run_quiet(cmd):
     return out.returncode == 0, lines[-1].strip() if lines else f"kod {out.returncode}"
 
 
-def _open_login_window(cmd):
-    """Blocks until the user closes the window, which keeps logins strictly one at a time."""
-    subprocess.Popen(cmd, env=_env(), cwd=Path.home(), creationflags=subprocess.CREATE_NEW_CONSOLE).wait()
+def _open_login_window(cmd, done, poll=3.0):
+    """Blocks until the user closes the window or done() says the login landed, keeping logins
+    one at a time. Gemini stays in its chat after a browser login, so it would never exit on its own."""
+    proc = subprocess.Popen(cmd, env=_env(), cwd=Path.home(), creationflags=subprocess.CREATE_NEW_CONSOLE)
+    while True:
+        try:
+            proc.wait(timeout=poll)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        if done():
+            # The .cmd shim runs under cmd.exe, so the whole tree must go.
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True,
+                           creationflags=NO_WINDOW)
+            proc.wait()
+            return
 
 
 def run_setup(log, run=_run_quiet, open_window=_open_login_window):
@@ -138,7 +151,7 @@ def run_setup(log, run=_run_quiet, open_window=_open_login_window):
             continue
         log(info.get("login_hint") or f"{info['label']}: zaloguj się w nowym oknie.")
         try:
-            open_window([exe, *info["login"]])
+            open_window([exe, *info["login"]], lambda: is_logged_in(tool, exe))
         except OSError as exc:
             log(f"{info['label']}: nie udało się otworzyć okna ({exc}).")
         if is_logged_in(tool, exe):

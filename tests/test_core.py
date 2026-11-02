@@ -379,7 +379,7 @@ class Installer(unittest.TestCase):
                 present.add(target)
             return bool(target), "ok"
 
-        def window(cmd):
+        def window(cmd, done):
             calls.append(("window", cmd))
             logged_in.add(cmd[0])
 
@@ -412,15 +412,24 @@ class Installer(unittest.TestCase):
     def test_failed_install_is_reported_not_hidden(self):
         with mock.patch.object(setup, "find", lambda n: None), mock.patch.object(setup, "refresh_path", lambda: None):
             log = []
-            ready = setup.run_setup(log.append, lambda cmd: (False, "brak sieci"), lambda cmd: self.fail("window"))
+            ready = setup.run_setup(log.append, lambda cmd: (False, "brak sieci"), lambda cmd, done: self.fail("window"))
         self.assertFalse(ready)
         self.assertTrue(any("brak sieci" in line for line in log))
 
     def test_window_closed_without_login_is_not_ready(self):
         with mock.patch.object(setup, "find", lambda n: n), mock.patch.object(setup, "is_logged_in", lambda t, e: False):
             log = []
-            self.assertFalse(setup.run_setup(log.append, lambda cmd: (True, ""), lambda cmd: None))
+            self.assertFalse(setup.run_setup(log.append, lambda cmd: (True, ""), lambda cmd, done: None))
         self.assertTrue(any("nieukończone" in line for line in log))
+
+    def test_login_window_closes_itself_once_logged_in(self):
+        # A console that would otherwise wait a minute, like Gemini sitting in its chat after login.
+        cmd = ["cmd.exe", "/c", "ping -n 60 127.0.0.1 >nul"]
+        checks = []
+        started = time.time()
+        setup._open_login_window(cmd, lambda: checks.append(1) or len(checks) >= 2, poll=0.3)
+        self.assertLess(time.time() - started, 15)
+        self.assertEqual(len(checks), 2)
 
     def test_real_status_and_path_refresh_do_not_lose_path(self):
         before = os.environ["PATH"]
