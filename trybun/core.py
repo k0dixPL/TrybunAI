@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import setup
 from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
-                     is_safe_arg, parse_event, session_name)
+                     is_safe_arg, parse_event, session_name, stdin_payload)
 from .remote import RemoteControl
 
 STATE_DIR = ".trybunai"
@@ -32,7 +32,7 @@ _STRIP_ENV = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT", "_
 
 _MENTION = re.compile(r"^\s*@([\w-]+)[\s,:]*")
 _ALIASES = {"claude": ["claude"], "codex": ["codex"], "gemini": ["gemini"],
-            "haiku": ["haiku"]}
+            "haiku": ["haiku"], "antigravity": ["antigravity"], "agy": ["antigravity"]}
 _LOST_SESSION = re.compile(
     r"(no (conversation|session|thread|rollout)|(session|thread|conversation).{0,40}not found"
     r"|invalid session identifier)", re.I)
@@ -42,7 +42,7 @@ _AUTH = re.compile(r"auth method|not logged in|please (run )?/?login|401 unautho
 
 def default_everyone():
     """Who @wszyscy reaches. Haiku would only duplicate Claude; Gemini needs an API key."""
-    return ["claude", "codex"] + (["gemini"] if os.environ.get("GEMINI_API_KEY") else [])
+    return ["claude", "codex", "antigravity"] + (["gemini"] if os.environ.get("GEMINI_API_KEY") else [])
 
 
 def parse_targets(text, default, everyone=None):
@@ -239,7 +239,8 @@ class Session:
                 "messages": self.messages,
                 "settings": self.settings,
                 "remote": self._remote.status(),
-                "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a))}
+                "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a)),
+                               "optional": bool(AGENTS[a].get("optional"))}
                            for a in AGENTS},
             }
 
@@ -610,7 +611,7 @@ class Session:
 
         def feed_stdin():  # separate thread: a large prompt must not block reading stdout
             try:
-                proc.stdin.write(prompt.encode("utf-8"))
+                proc.stdin.write(stdin_payload(agent, prompt).encode("utf-8"))
                 proc.stdin.close()
             except OSError:
                 pass  # the process already exited; its error surfaces through stderr

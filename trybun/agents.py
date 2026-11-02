@@ -1,6 +1,8 @@
 """Knowledge about each CLI: how to invoke it and how to read its JSONL output."""
 from __future__ import annotations
 
+import json
+import os
 import platform
 import re
 import shutil
@@ -8,7 +10,11 @@ import shutil
 AGENTS = {
     "claude": {"label": "Claude", "binary": "claude"},
     "codex": {"label": "Codex", "binary": "codex"},
-    "gemini": {"label": "Gemini", "binary": "gemini"},
+    # Google's successor to Gemini CLI for personal accounts (free tier with limits).
+    "antigravity": {"label": "Antigravity", "binary": "agy",
+                    "fallback": os.path.join(os.environ.get("LOCALAPPDATA", ""), "agy", "bin", "agy.exe")},
+    # Since June 2026 Gemini CLI only serves API keys, so it is shown only once installed.
+    "gemini": {"label": "Gemini", "binary": "gemini", "optional": True},
     # Same CLI as Claude, cheaper and faster model, its own conversation.
     "haiku": {"label": "Haiku", "binary": "claude", "family": "claude", "model": "haiku"},
 }
@@ -30,7 +36,29 @@ def find_binary(agent_id: str) -> str | None:
         path = shutil.which(candidate)
         if path:
             return path
-    return None
+    # A fresh install edits PATH in the registry, which a running app does not see.
+    fallback = AGENTS[agent_id].get("fallback")
+    return fallback if fallback and os.path.isfile(fallback) else None
+
+
+def _agy_settings(mode, prompter):
+    """Antigravity's own default writes files unasked, so every mode gets explicit rules.
+    Outside a trusted folder headless agy denies even reads unless they are allowed."""
+    if prompter:
+        rules = {"deny": ["read_file(*)", "write_file(*)", "command(*)"]}
+    elif mode == "edit":
+        rules = {"allow": ["read_file(*)", "write_file(*)"], "deny": ["command(*)"]}
+    else:
+        rules = {"allow": ["read_file(*)"], "deny": ["write_file(*)", "command(*)"]}
+    return json.dumps({"permissions": rules})
+
+
+def stdin_payload(agent_id, prompt):
+    """Antigravity reads stdin only as stream-json; the others take plain text."""
+    if _family(agent_id) == "antigravity":
+        return json.dumps({"event": "user", "message": {"role": "user", "content": prompt}},
+                          ensure_ascii=False) + "\n"
+    return prompt
 
 
 def _family(agent_id):
@@ -85,6 +113,15 @@ def build_command(agent_id, exe, mode="read", session=None, model=None, prompter
         cmd += ["--approval-mode", "default" if prompter else approval]
         if session:
             cmd += ["--resume", session]
+    elif family == "antigravity":
+        # agy.exe is a real exe, not a .cmd shim, so the JSON argument does not pass through cmd.exe.
+        cmd = [exe, "--input-format", "stream-json", "--output-format", "stream-json"]
+        if mode == "full" and not prompter:
+            cmd += ["--dangerously-skip-permissions"]
+        else:
+            cmd += ["--settings", _agy_settings(mode, prompter)]
+        if session:
+            cmd += ["--conversation", session]
     else:
         raise ValueError(f"unknown agent: {agent_id}")
 
@@ -117,7 +154,9 @@ def _shorten(value, limit=140):
 
 def _tool_summary(name, params):
     if isinstance(params, dict):
-        for key in ("command", "file_path", "path", "pattern", "query", "url", "description"):
+        params = {str(k).lower(): v for k, v in params.items()}  # Antigravity uses "Path", "CommandLine"
+        for key in ("command", "commandline", "file_path", "path", "absolutepath", "pattern", "query",
+                    "url", "description"):
             if params.get(key):
                 return f"{name}: {_shorten(params[key])}"
     return str(name)
@@ -130,7 +169,8 @@ def parse_event(agent_id, obj):
     """
     if not isinstance(obj, dict):
         return []
-    return {"claude": _parse_claude, "codex": _parse_codex, "gemini": _parse_gemini}[_family(agent_id)](obj)
+    return {"claude": _parse_claude, "codex": _parse_codex, "gemini": _parse_gemini,
+            "antigravity": _parse_antigravity}[_family(agent_id)](obj)
 
 
 def _parse_claude(o):
@@ -193,4 +233,24 @@ def _parse_gemini(o):
     if kind == "result" and o.get("status") == "error":
         err = o.get("error") or {}
         return [("fatal", str(err.get("message") if isinstance(err, dict) else err))]
+    return []
+
+
+def _parse_antigravity(o):
+    kind = o.get("event")
+    if kind == "init":
+        return [("session", o.get("conversation_id"))]
+    if kind == "result":
+        res = o.get("result") or {}
+        if res.get("status") != "SUCCESS":
+            return [("fatal", str(res.get("error") or res.get("finished_reason") or "Antigravity: tura nieudana"))]
+        return []
+    step = o.get("step_update") or {}
+    if kind != "step_update":
+        return []
+    if step.get("step_type") == "agent_response" and step.get("text_delta"):
+        return [("text", step["text_delta"])]
+    if step.get("step_type") == "tool" and step.get("state") == "ACTIVE":
+        info = step.get("tool_info") or {}
+        return [("break", None), ("activity", _tool_summary(step.get("tool_name"), info.get("parameters")))]
     return []

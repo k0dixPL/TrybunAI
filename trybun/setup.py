@@ -29,10 +29,14 @@ TOOLS = {
                "login": ["auth", "login"]},
     "codex": {"label": "Codex", "install": [_WINGET + ["OpenAI.Codex"], _npm("@openai/codex")],
               "login": ["login"]},
-    "gemini": {"label": "Gemini CLI", "needs_node": True, "install": [_npm("@google/gemini-cli")],
-               "login": [],
-               "login_hint": "Gemini: wybierz logowanie w oknie. Okno zamknie się samo po zalogowaniu."},
+    # Google's official installer: downloads agy.exe, checks its SHA-512, adds it to the user PATH.
+    "agy": {"label": "Antigravity CLI",
+            "install": [["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                         "irm https://antigravity.google/cli/install.ps1 | iex"]],
+            "login": [],
+            "login_hint": "Antigravity: zaloguj się kontem Google w oknie. Okno zamknie się samo po zalogowaniu."},
 }
+_FALLBACK = {"agy": Path(os.environ.get("LOCALAPPDATA", "")) / "agy" / "bin" / "agy.exe"}
 
 
 def refresh_path():
@@ -55,7 +59,8 @@ def find(name):
         path = shutil.which(candidate)
         if path:
             return path
-    return None
+    fallback = _FALLBACK.get(name)
+    return str(fallback) if fallback and fallback.is_file() else None
 
 
 def is_logged_in(tool, exe):
@@ -68,9 +73,10 @@ def is_logged_in(tool, exe):
             out = subprocess.run([exe, "login", "status"], capture_output=True, timeout=30,
                                  creationflags=NO_WINDOW, env=_env(), stdin=subprocess.DEVNULL)
             return out.returncode == 0
-        if tool == "gemini":
-            return bool(os.environ.get("GEMINI_API_KEY")) or \
-                (Path.home() / ".gemini" / "oauth_creds.json").exists()
+        if tool == "agy":  # signed out, it refuses to list models
+            out = subprocess.run([exe, "models"], capture_output=True, timeout=30,
+                                 creationflags=NO_WINDOW, env=_env(), stdin=subprocess.DEVNULL)
+            return out.returncode == 0
     except (OSError, ValueError, subprocess.SubprocessError):
         pass
     return False
@@ -125,11 +131,6 @@ def run_setup(log, run=_run_quiet, open_window=_open_login_window):
         if find(tool):
             log(f"{info['label']}: już zainstalowany.")
             continue
-        if info.get("needs_node") and not find("npm"):
-            log("Instaluję Node.js (potrzebny dla Gemini). Windows może poprosić o zgodę…")
-            ok, detail = run(_WINGET + ["OpenJS.NodeJS.LTS"])
-            refresh_path()
-            log("Node.js: gotowy." if ok and find("npm") else f"Node.js: nie udało się ({detail}).")
         log(f"{info['label']}: instaluję…")
         detail = ""
         for cmd in info["install"]:

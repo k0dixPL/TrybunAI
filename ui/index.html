@@ -6,7 +6,7 @@
 <title>TrybunAI</title>
 <style>
 :root{--bg:#14161a;--panel:#1c1f25;--panel2:#252932;--line:#323742;--text:#e6e8ec;--dim:#969cab;
---claude:#e08a5f;--codex:#4fbf8f;--gemini:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--danger:#e5676b}
+--claude:#e08a5f;--codex:#4fbf8f;--gemini:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--antigravity:#e874b0;--danger:#e5676b}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--text);font:14.5px/1.55 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
@@ -27,9 +27,9 @@ header img{height:30px;width:30px}
 .empty code{color:var(--text)}
 .msg{margin-bottom:15px;padding:9px 13px;border-radius:9px;background:var(--panel);border-left:3px solid var(--line);overflow-wrap:anywhere}
 .msg.user{background:var(--panel2)}
-.msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.gemini{border-left-color:var(--gemini)}.msg.haiku{border-left-color:var(--haiku)}
+.msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.gemini{border-left-color:var(--gemini)}.msg.haiku{border-left-color:var(--haiku)}.msg.antigravity{border-left-color:var(--antigravity)}
 .who{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin-bottom:3px}
-.who strong.claude{color:var(--claude)}.who strong.codex{color:var(--codex)}.who strong.gemini{color:var(--gemini)}.who strong.haiku{color:var(--haiku)}
+.who strong.claude{color:var(--claude)}.who strong.codex{color:var(--codex)}.who strong.gemini{color:var(--gemini)}.who strong.haiku{color:var(--haiku)}.who strong.antigravity{color:var(--antigravity)}
 .who .sp{flex:1}
 .who button{padding:0 8px;font-size:12px}
 .body>:first-child{margin-top:0}.body>:last-child{margin-bottom:0}
@@ -61,6 +61,7 @@ footer{background:var(--panel);border-top:1px solid var(--line);padding:9px 14px
 .chip.on.codex{background:var(--codex);border-color:var(--codex);color:#14161a}
 .chip.on.gemini{background:var(--gemini);border-color:var(--gemini);color:#14161a}
 .chip.on.haiku{background:var(--haiku);border-color:var(--haiku);color:#14161a}
+.chip.on.antigravity{background:var(--antigravity);border-color:var(--antigravity);color:#14161a}
 #setuprows div{display:flex;justify-content:space-between;margin:5px 0}
 #setuprows .bad{color:var(--danger)}#setuprows .good{color:var(--codex)}
 #setuplog{background:#0f1114;border-radius:7px;padding:8px 10px;margin-top:10px;max-height:190px;overflow-y:auto;font-size:13px;white-space:pre-wrap}
@@ -116,7 +117,7 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <div id="files"></div>
   <div id="row">
     <button id="attach" title="Załącz plik lub obraz (obraz możesz też wkleić przez Ctrl+V)">Załącz</button>
-    <textarea id="input" rows="1" placeholder="Napisz wiadomość albo: @codex …, @claude @gemini …, @wszyscy …, @haiku …"></textarea>
+    <textarea id="input" rows="1" placeholder="Napisz wiadomość albo: @codex …, @claude @agy …, @wszyscy …, @haiku …"></textarea>
     <button id="refine" title="Przepisz tekst na dobry prompt (Alt+P)">Prompter</button>
     <button id="sendbtn">Wyślij</button>
   </div>
@@ -132,7 +133,7 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <h3>Zdalne sterowanie Claude</h3>
   <div id="remotestate" role="status"></div>
   <div id="remoteerr" class="err"></div>
-  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
+  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex, Antigravity i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
   <menu style="gap:8px"><button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button><button id="remoteclose" type="button">Zamknij</button><button id="remotetoggle" type="button"></button></menu>
 </dialog>
 <dialog id="dlg"><form method="dialog">
@@ -276,7 +277,7 @@ function render() {
   $("project").textContent = S.project; $("project").title = "Zmień folder: " + S.project;
   if (!S.messages.length) {
     const e = document.createElement("div"); e.className = "empty";
-    e.innerHTML = '<img class="logo" alt="">' + "Wybierz model poniżej albo zacznij od <code>@codex</code>, <code>@claude @gemini</code>, <code>@wszyscy</code>.<br>Dyskusja między modelami: <code>@debata 3 @claude @codex temat</code>.<br>Przycisk Prompter przepisze Twój tekst na prompt, zanim go wyślesz.";
+    e.innerHTML = '<img class="logo" alt="">' + "Wybierz model poniżej albo zacznij od <code>@codex</code>, <code>@claude @agy</code>, <code>@wszyscy</code>.<br>Dyskusja między modelami: <code>@debata 3 @claude @codex temat</code>.<br>Przycisk Prompter przepisze Twój tekst na prompt, zanim go wyślesz.";
     $("items").append(e);
     showLogo();
   }
@@ -286,10 +287,12 @@ function render() {
   }
   drawChips(); drawMode(); scrollDown();
 }
+// An optional model (Gemini) that is not installed stays out of sight instead of showing "(brak)".
+const shown = () => Object.entries(S.agents).filter(([, a]) => a.available || !a.optional);
 function drawChips() {
   document.querySelectorAll(".chip").forEach(c => c.remove());
   const hint = $("hint");
-  for (const [id, a] of Object.entries(S.agents)) {
+  for (const [id, a] of shown()) {
     const c = document.createElement("button");
     c.type = "button"; c.className = `chip ${id}` + (S.settings.target === id ? " on" : "");
     c.textContent = a.label + (a.available ? "" : " (brak)"); c.disabled = !a.available;
@@ -405,20 +408,20 @@ function drawRemote() {
 
 function fillSettings() {
   const eng = $("engine"); eng.replaceChildren();
-  for (const [id, a] of Object.entries(S.agents)) {
+  for (const [id, a] of shown()) {
     const o = document.createElement("option"); o.value = id;
     o.textContent = a.label + (a.available ? "" : " (brak)"); o.disabled = !a.available; eng.append(o);
   }
   eng.value = S.settings.prompter;
   const crowd = $("everyone");
   crowd.querySelectorAll("label").forEach(l => l.remove());
-  for (const [id, a] of Object.entries(S.agents)) {
+  for (const [id, a] of shown()) {
     const l = document.createElement("label"), c = document.createElement("input");
     c.type = "checkbox"; c.dataset.agent = id; c.checked = S.settings.everyone.includes(id);
     l.append(c, a.label + (a.available ? "" : " (brak)")); crowd.append(l);
   }
   const box = $("models"); box.replaceChildren();
-  for (const [id, a] of Object.entries(S.agents)) {
+  for (const [id, a] of shown()) {
     const l = document.createElement("label"); l.textContent = "Model: " + a.label;
     const i = document.createElement("input"); i.type = "text"; i.dataset.agent = id;
     i.value = S.settings.models[id] || ""; i.placeholder = id === "haiku" ? "haiku" : "domyślny"; l.append(i); box.append(l);
@@ -508,7 +511,7 @@ window.addEventListener("pywebviewready", async () => {
   await reload();
   $("input").focus();
   // A new laptop: show what is missing straight away.
-  if (Object.values(S.agents).some(a => !a.available)) $("setupbtn").click();
+  if (Object.values(S.agents).some(a => !a.available && !a.optional)) $("setupbtn").click();
 });
 </script>
 </body>

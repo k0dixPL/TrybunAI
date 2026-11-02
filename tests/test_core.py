@@ -11,7 +11,8 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from trybun import core, setup  # noqa: E402
-from trybun.agents import build_command, build_remote_command, parse_event, session_name  # noqa: E402
+from trybun.agents import (build_command, build_remote_command, parse_event, session_name,  # noqa: E402
+                           stdin_payload)
 from trybun.remote import RemoteControl  # noqa: E402
 from trybun.core import (Session, build_turn_prompt, clean_prompter_output, parse_debate,  # noqa: E402
                          parse_targets)
@@ -118,7 +119,7 @@ class Pure(unittest.TestCase):
             self.assertIn("gemini", core.default_everyone())
         env = {k: v for k, v in os.environ.items() if k != "GEMINI_API_KEY"}
         with mock.patch.dict(os.environ, env, clear=True):
-            self.assertEqual(core.default_everyone(), ["claude", "codex"])
+            self.assertEqual(core.default_everyone(), ["claude", "codex", "antigravity"])
 
     def test_debate_parsing(self):
         team = ["claude", "codex"]
@@ -153,6 +154,38 @@ class Pure(unittest.TestCase):
         cmd = build_command("haiku", "c", "read", prompter=True)
         self.assertIn("--no-session-persistence", cmd)
         self.assertIn("haiku", cmd)
+
+    def test_antigravity_command_and_permissions(self):
+        def rules(mode, **kw):
+            cmd = build_command("antigravity", "agy.exe", mode, **kw)
+            return json.loads(cmd[cmd.index("--settings") + 1])["permissions"]
+        self.assertEqual(rules("read"), {"allow": ["read_file(*)"], "deny": ["write_file(*)", "command(*)"]})
+        self.assertIn("write_file(*)", rules("edit")["allow"])
+        self.assertIn("command(*)", rules("edit")["deny"])
+        self.assertNotIn("allow", rules("full", prompter=True), "the prompter never gets tools")
+        cmd = build_command("antigravity", "agy.exe", "full", session="c-1", model="gemini-3.8-flash-high")
+        self.assertIn("--dangerously-skip-permissions", cmd)
+        self.assertEqual(cmd[cmd.index("--conversation") + 1], "c-1")
+        self.assertNotIn("-p", cmd, "the prompt goes through stdin as stream-json")
+        line = json.loads(stdin_payload("antigravity", "zażółć"))
+        self.assertEqual(line, {"event": "user", "message": {"role": "user", "content": "zażółć"}})
+        self.assertEqual(stdin_payload("codex", "x"), "x")
+        self.assertEqual(parse_targets("@agy hej", "claude"), (["antigravity"], "hej"))
+
+    def test_antigravity_events(self):
+        ev = lambda o: parse_event("antigravity", o)
+        self.assertEqual(ev({"event": "init", "conversation_id": "c-1"}), [("session", "c-1")])
+        self.assertEqual(ev({"event": "step_update", "step_update": {"step_type": "agent_response",
+                                                                     "state": "ACTIVE", "text_delta": "ok"}}),
+                         [("text", "ok")])
+        tool = {"event": "step_update", "step_update": {"step_type": "tool", "state": "ACTIVE", "tool_name": "read_file",
+                                                        "tool_info": {"parameters": {"Path": "C:\\a.txt"}}}}
+        self.assertEqual(ev(tool), [("break", None), ("activity", "read_file: C:\\a.txt")])
+        tool["step_update"]["state"] = "DONE"
+        self.assertEqual(ev(tool), [], "a tool is announced once")
+        self.assertEqual(ev({"event": "result", "result": {"status": "SUCCESS", "response": "ok"}}), [])
+        self.assertEqual(ev({"event": "result", "result": {"status": "ERROR", "error": "brak limitu"}}),
+                         [("fatal", "brak limitu")])
 
     def test_claude_sessions_get_fixed_name(self):
         with mock.patch("platform.node", return_value="MOJ PC"):
@@ -374,7 +407,7 @@ class Installer(unittest.TestCase):
         def run(cmd):
             calls.append(("run", cmd))
             target = {"Anthropic.ClaudeCode": "claude", "OpenAI.Codex": "codex",
-                      "OpenJS.NodeJS.LTS": "npm", "@google/gemini-cli": "gemini"}.get(cmd[-1])
+                      "irm https://antigravity.google/cli/install.ps1 | iex": "agy"}.get(cmd[-1])
             if target:
                 present.add(target)
             return bool(target), "ok"
@@ -394,18 +427,18 @@ class Installer(unittest.TestCase):
         ready, calls, _ = self.scenario([], [])
         self.assertTrue(ready)
         kinds = [c[0] for c in calls]
-        self.assertEqual(kinds, ["run"] * 4 + ["window"] * 3, "all installs come before any login")
-        self.assertEqual(calls[2][1][-1], "OpenJS.NodeJS.LTS", "Node goes before Gemini")
-        self.assertEqual([c[1] for c in calls[4:]], [["claude", "auth", "login"], ["codex", "login"], ["gemini"]])
+        self.assertEqual(kinds, ["run"] * 3 + ["window"] * 3, "all installs come before any login")
+        self.assertEqual(calls[2][1][0], "powershell", "Antigravity uses Google's own installer")
+        self.assertEqual([c[1] for c in calls[3:]], [["claude", "auth", "login"], ["codex", "login"], ["agy"]])
 
     def test_ready_machine_does_nothing(self):
-        all_tools = ["claude", "codex", "gemini", "npm"]
+        all_tools = ["claude", "codex", "agy"]
         ready, calls, _ = self.scenario(all_tools, all_tools)
         self.assertTrue(ready)
         self.assertEqual(calls, [])
 
     def test_only_missing_login_opens_window(self):
-        ready, calls, _ = self.scenario(["claude", "codex", "gemini"], ["claude", "gemini"])
+        ready, calls, _ = self.scenario(["claude", "codex", "agy"], ["claude", "agy"])
         self.assertTrue(ready)
         self.assertEqual(calls, [("window", ["codex", "login"])])
 

@@ -1,4 +1,4 @@
-"""TrybunAI: one chat window for Claude Code, Codex and Gemini CLI."""
+"""TrybunAI: one chat window for Claude Code, Codex, Antigravity and Gemini CLI."""
 from __future__ import annotations
 
 import base64
