@@ -1,5 +1,17 @@
 # Zmiany
 
+## 1.0.7 — 2026-11-07
+- Menu debaty (przycisk „Debata”): temat, uczestnicy, liczba rund, kto zaczyna, kto kończy,
+  kto wdraża po debacie (ze swoimi uprawnieniami) i opcjonalne sprawdzenie wdrożenia przez pozostałych.
+  Ostatnie ustawienia są zapamiętywane.
+- Debata odmawia startu, gdy wybrany wdrażający ma „Tylko odczyt”; ostrzega, gdy temat każe coś
+  wdrożyć, a nikt nie jest wybrany do wdrożenia.
+- Przy odpowiedziach Claude, Haiku i Antigravity: model, rozmiar kontekstu i liczba kroków.
+- Gdy sesja modelu przekroczy 150 tys. tokenów: ostrzeżenie z przyciskiem „Świeża sesja”
+  (model dostaje wtedy ostatnie wiadomości czatu, także swoje).
+- Claude i Haiku bez skilli i poleceń slash: około 25% mniej stałego narzutu na każdy krok.
+- Błąd „authentication failed / please sign in” podpowiada logowanie przez „Instalacja”.
+
 ## 1.0.6 — 2026-11-02
 - Ustawienia: sekcja „Plany i limity” z planem i zużyciem limitów Claude/Haiku, Codexa i Antigravity,
   z paskami i godziną odnowienia. Sprawdzanie nie zużywa limitów: Claude z odpowiedzi modelu,

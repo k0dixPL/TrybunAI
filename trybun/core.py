@@ -37,7 +37,8 @@ _LOST_SESSION = re.compile(
     r"(no (conversation|session|thread|rollout)|(session|thread|conversation).{0,40}not found"
     r"|invalid session identifier)", re.I)
 _INELIGIBLE = re.compile(r"IneligibleTierError|no longer supported for Gemini Code Assist", re.I)
-_AUTH = re.compile(r"auth method|not logged in|please (run )?/?login|401 unauthorized", re.I)
+_AUTH = re.compile(r"auth method|not logged in|please (run )?/?login|401 unauthorized"
+                   r"|authentication failed|please sign in", re.I)
 
 
 def default_everyone():
@@ -84,8 +85,24 @@ def parse_debate(text, everyone):
     return {"rounds": rounds, "agents": agents, "topic": topic}
 
 
+_IMPLEMENT_WORDS = re.compile(r"wdr[oó][żz]|wprowad[źz]|zaimplementuj|zakoduj|popraw w pliku|zmie[nń] w pliku", re.I)
+CONTEXT_WARN = 150_000  # tokens; past this every step of a reply re-reads a huge session
+
+
+def build_implement_turn(agents):
+    names = ", ".join(AGENTS[a]["label"] for a in agents)
+    return (f"Debata modeli ({names}) właśnie się zakończyła. Wdróż w plikach projektu to, na czym stanęło. "
+            "Trzymaj się ustaleń, nie dokładaj nowych pomysłów. Na końcu krótko wypisz, co zmieniłeś.")
+
+
+def build_review_turn(implementer):
+    return (f"{AGENTS[implementer]['label']} wdrożył ustalenia z debaty. Sprawdź zmienione pliki: "
+            "czy zrobił to, co uzgodniliśmy, i czy coś się nie zepsuło. Wypisz konkretne błędy i poprawki, "
+            "krótko. Niczego nie zmieniaj.")
+
+
 def build_debate_turn(topic, agents, turn_round, rounds):
-    others = ", ".join(AGENTS[a]["label"] for a in agents)
+    others = " → ".join(AGENTS[a]["label"] for a in agents)
     if turn_round == 1:
         task = "Przedstaw swoje stanowisko."
     elif turn_round == rounds:
@@ -93,10 +110,11 @@ def build_debate_turn(topic, agents, turn_round, rounds):
                 "na czym stanęło, co pozostaje sporne.")
     else:
         task = "Odnieś się do konkretnych argumentów pozostałych: co jest błędne, czego brakuje, co zmienia Twoje zdanie."
-    return (f"Trwa debata modeli: {others}. Runda {turn_round} z {rounds}.\n"
+    return (f"Trwa debata modeli w kolejności: {others}. Runda {turn_round} z {rounds}.\n"
             f"Temat od użytkownika:\n{topic}\n\n{task}\n"
             "Pisz konkretnie i krótko. Nie zgadzaj się ani nie spieraj na siłę; jeśli ktoś ma rację, powiedz to. "
-            "Możesz czytać pliki projektu, ale niczego nie zmieniaj.")
+            "Debata działa tylko do odczytu: możesz czytać pliki projektu, ale niczego nie zmieniaj, "
+            "nawet jeśli temat o to prosi. Nie czytaj ponownie plików, które już znasz.")
 
 
 def _speaker(msg):
@@ -105,11 +123,14 @@ def _speaker(msg):
     return AGENTS[msg["agent"]]["label"]
 
 
-def build_turn_prompt(messages, agent_id, text):
-    """Prepend whatever this agent has not seen, so all models share one conversation."""
+def build_turn_prompt(messages, agent_id, text, include_own=False):
+    """Prepend whatever this agent has not seen, so all models share one conversation.
+
+    A model normally remembers its own replies; a fresh session (include_own) does not.
+    """
     lines, total = [], 0
     for msg in reversed(messages):
-        if msg.get("agent") == agent_id or not msg.get("text"):
+        if (msg.get("agent") == agent_id and not include_own) or not msg.get("text"):
             continue
         if msg.get("status") == "error":
             continue
@@ -173,6 +194,14 @@ class _Result:
         self.stopped = False
         self.returncode = None
         self.tail = collections.deque(maxlen=20)
+        self.calls = set()  # one model call arrives split over several events
+        self.model = None
+        self.context = 0
+
+    def usage(self):
+        if not self.calls:
+            return None
+        return {"model": self.model, "context": self.context, "calls": len(self.calls)}
 
     @property
     def ok(self):
@@ -184,7 +213,7 @@ class _Result:
             detail += ("\n\nGoogle nie obsługuje już darmowego logowania kontem w Gemini CLI. "
                        "Ten model zadziała z kluczem API (zmienna GEMINI_API_KEY).")
         elif _AUTH.search(detail):
-            detail += "\n\nTo CLI nie jest zalogowane. Uruchom je raz w terminalu i zaloguj się."
+            detail += "\n\nTo CLI nie jest zalogowane. Kliknij „Instalacja” na górze okna i zaloguj się."
         return detail
 
 
@@ -239,6 +268,8 @@ class Session:
                 "messages": self.messages,
                 "settings": self.settings,
                 "remote": self._remote.status(),
+                "context_warn": CONTEXT_WARN,
+                "live_sessions": [a for a, s in self.sessions.items() if s.get("id")],
                 "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a)),
                                "optional": bool(AGENTS[a].get("optional"))}
                            for a in AGENTS},
@@ -293,7 +324,9 @@ class Session:
         attachments = list(attachments)
         debate = parse_debate(text, everyone)
         if debate:
-            return self._start_debate(debate, attachments)
+            if "error" in debate:
+                return {"ok": False, "error": debate["error"]}
+            return self.start_debate({**debate, "attachments": attachments})
         targets, body = parse_targets(text, default_target, everyone)
         if not targets:
             return {"ok": False, "error": "Żaden model nie bierze udziału w @wszyscy. Zmień to w Ustawieniach."}
@@ -324,32 +357,63 @@ class Session:
         return {"id": uuid.uuid4().hex, "role": role, "ts": time.time(), **fields}
 
     # ---- debate ----------------------------------------------------------
-    def _start_debate(self, debate, attachments):
-        if "error" in debate:
-            return {"ok": False, "error": debate["error"]}
-        agents, rounds, topic = debate["agents"], debate["rounds"], debate["topic"]
+    def start_debate(self, plan):
+        """plan: topic, agents (in speaking order), rounds, optional implementer, review, attachments.
+        Both the @debata text and the debate menu end up here."""
+        try:
+            topic = str(plan.get("topic") or "").strip()
+            agents = list(dict.fromkeys(plan.get("agents") or []))
+            rounds = int(plan.get("rounds") or DEFAULT_ROUNDS)
+            implementer = plan.get("implementer") or None
+            review = bool(plan.get("review")) and bool(implementer)
+            attachments = list(plan.get("attachments") or [])
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "Nieprawidłowe ustawienia debaty."}
+        if any(a not in AGENTS for a in agents) or (implementer and implementer not in AGENTS):
+            return {"ok": False, "error": "Nieznany model."}
+        if len(agents) < 2:
+            return {"ok": False, "error": "Do debaty potrzeba co najmniej dwóch modeli."}
+        if not 1 <= rounds <= MAX_ROUNDS:
+            return {"ok": False, "error": f"Debata może mieć od 1 do {MAX_ROUNDS} rund."}
+        if not topic:
+            return {"ok": False, "error": "Podaj temat debaty."}
         if any(not self._attachment_path(a) for a in attachments):
             return {"ok": False, "error": "Załącznik już nie istnieje."}
+        everybody = agents + ([implementer] if implementer and implementer not in agents else [])
         with self._lock:
-            missing = [AGENTS[a]["label"] for a in agents if not self._binaries.get(a)]
+            if "debate" in self._busy:
+                return {"ok": False, "error": "Trwa debata. Poczekaj albo ją zatrzymaj."}
+            missing = [AGENTS[a]["label"] for a in everybody if not self._binaries.get(a)]
             if missing:
                 return {"ok": False, "error": f"Nie znaleziono CLI: {', '.join(missing)}."}
-            busy = [AGENTS[a]["label"] for a in agents if a in self._busy]
+            busy = [AGENTS[a]["label"] for a in everybody if a in self._busy]
             if busy:
                 return {"ok": False, "error": f"Jeszcze pracuje: {', '.join(busy)}."}
+            if implementer and self.settings["modes"].get(implementer, "read") == "read":
+                # Otherwise the whole debate ends with a turn that cannot write anything.
+                return {"ok": False, "error": f"{AGENTS[implementer]['label']} ma uprawnienia „Tylko odczyt”, "
+                                              "więc nie wdroży zmian. Zmień mu uprawnienia albo wybierz innego."}
             msg = self._new_message("user", text=topic, targets=agents, debate=rounds)
+            if implementer:
+                msg["implementer"] = implementer
             if attachments:
                 msg["attachments"] = attachments
             self.messages.append(msg)
             # Everyone stays busy for the whole debate, so nothing can interleave with it.
-            self._busy.update(agents)
+            self._busy.update(everybody)
             self._busy.add("debate")
             self.save()
         self.emit({"t": "message", "message": msg})
-        threading.Thread(target=self._run_debate, args=(agents, rounds, topic, attachments), daemon=True).start()
-        return {"ok": True}
+        threading.Thread(target=self._run_debate, args=(agents, rounds, topic, attachments, implementer, review),
+                         daemon=True).start()
+        warn = None
+        if not implementer and _IMPLEMENT_WORDS.search(topic):
+            warn = ("Debata działa tylko do odczytu, więc nikt w niej niczego nie wdroży. "
+                    "Wybierz „Kto wdraża” w menu Debata albo napisz potem np. @claude wdrażaj.")
+        return {"ok": True, "warn": warn}
 
-    def _run_debate(self, agents, rounds, topic, attachments):
+    def _run_debate(self, agents, rounds, topic, attachments, implementer=None, review=False):
+        everybody = agents + ([implementer] if implementer and implementer not in agents else [])
         outcome = f"Debata zakończona ({rounds} z {rounds} rund)."
         try:
             for turn_round in range(1, rounds + 1):
@@ -369,14 +433,47 @@ class Session:
                         outcome = (f"Debatę zatrzymano w rundzie {turn_round}." if status == "stopped"
                                    else f"Debata przerwana przez błąd modelu w rundzie {turn_round}.")
                         return
+            if not implementer:
+                return
+            # The implementer works with its own permissions; the debate itself stayed read-only.
+            status = self._after_debate_turn(implementer, build_implement_turn(agents), None, "wdrożenie")
+            if status != "ok":
+                outcome += " Wdrożenie " + ("zatrzymano." if status == "stopped" else "przerwał błąd modelu.")
+                return
+            outcome += f" {AGENTS[implementer]['label']} wdrożył ustalenia."
+            if review:
+                for agent in [a for a in agents if a != implementer]:
+                    status = self._after_debate_turn(agent, build_review_turn(implementer), "read", "sprawdzenie")
+                    if status != "ok":
+                        outcome += " Sprawdzanie przerwano."
+                        return
+                outcome += " Pozostali sprawdzili wdrożenie."
         except Exception as exc:  # participants must never stay busy forever
             outcome = f"Debata przerwana: {type(exc).__name__}: {exc}"
         finally:
             with self._lock:
-                self._busy.difference_update(agents)
+                self._busy.difference_update(everybody)
                 self._busy.discard("debate")
-                self._stop_requested.difference_update(agents)
+                self._stop_requested.difference_update(everybody)
             self.emit({"t": "debate_end", "text": outcome})
+
+    def _after_debate_turn(self, agent, body, mode, label):
+        with self._lock:
+            if agent in self._stop_requested:
+                return "stopped"
+            count = len(self.messages) + 1
+        return self._run_turn(agent, body, count, mode=mode, keep_busy=True, turn_label=label)
+
+    def fresh_session(self, agent):
+        """Forget a model's own long session; it gets the recent chat as context instead."""
+        with self._lock:
+            if agent not in AGENTS:
+                return {"ok": False, "error": "Nieznany model."}
+            if agent in self._busy:
+                return {"ok": False, "error": f"{AGENTS[agent]['label']} jeszcze pracuje."}
+            self.sessions[agent] = {"seen": 0}
+            self.save()
+        return {"ok": True}
 
     def _run_turn(self, agent, body, count, attachments=(), mode=None, keep_busy=False, turn_label=None):
         """Runs one model once and returns the reply's status."""
@@ -395,7 +492,7 @@ class Session:
             if attachments:
                 body += "\n\nZałączone pliki (ścieżki względem folderu projektu):\n" + \
                     "\n".join(f"- {a}" for a in attachments)
-            prompt = build_turn_prompt(unseen, agent, body)
+            prompt = build_turn_prompt(unseen, agent, body, include_own=not state.get("id"))
             images = [self._attachment_path(a) for a in attachments
                       if a.lower().endswith(IMAGE_SUFFIXES)] if agent == "codex" else []
             name = session_name(self.project.name, "" if agent == "claude" else agent)
@@ -418,6 +515,9 @@ class Session:
                 self.sessions[agent] = {"id": result.session, "seen": seen}
             msg = self._new_message("assistant", agent=agent, text=result.text.strip(),
                                     status=status, error=error)
+            usage = result.usage()
+            if usage:
+                msg["usage"] = usage
             if images:
                 msg["images"] = images
             if turn_label:
@@ -660,6 +760,10 @@ class Session:
             self._text(result, value, run_id)
         elif kind == "limits":
             limits.record_claude(value)
+        elif kind == "usage" and isinstance(value, dict):
+            result.calls.add(value.get("call"))
+            result.model = value.get("model") or result.model
+            result.context = value.get("context") or result.context
         elif kind in ("activity", "warn") and value:
             self.emit({"t": "activity", "id": run_id, "text": value})
 

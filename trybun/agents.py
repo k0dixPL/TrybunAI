@@ -77,8 +77,9 @@ def build_command(agent_id, exe, mode="read", session=None, model=None, prompter
             raise ValueError(f"unsafe argument: {value!r}")
 
     if family == "claude":
+        # Skills and slash commands are useless headless and cost ~6k tokens on every model call.
         cmd = [exe, "-p", "--output-format", "stream-json", "--verbose",
-               "--include-partial-messages"]
+               "--include-partial-messages", "--disable-slash-commands"]
         if prompter:
             cmd += ["--tools", "", "--no-session-persistence"]
         elif mode == "full":
@@ -165,7 +166,7 @@ def _tool_summary(name, params):
 def parse_event(agent_id, obj):
     """Translate one JSON line into (kind, value) tuples.
 
-    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits.
+    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits, usage.
     """
     if not isinstance(obj, dict):
         return []
@@ -190,9 +191,18 @@ def _parse_claude(o):
             if delta.get("type") == "text_delta":
                 return [("text", delta.get("text", ""))]
     elif kind == "assistant":
-        blocks = (o.get("message") or {}).get("content") or []
-        return [("activity", _tool_summary(b.get("name"), b.get("input")))
-                for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
+        message = o.get("message") or {}
+        blocks = message.get("content") or []
+        events = [("activity", _tool_summary(b.get("name"), b.get("input")))
+                  for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
+        usage = message.get("usage") or {}
+        if usage:
+            # Everything the model read for this call: the size of the session so far.
+            context = sum(usage.get(k) or 0 for k in
+                          ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+            events.append(("usage", {"call": message.get("id"), "model": message.get("model"),
+                                     "context": context}))
+        return events
     elif kind == "result":
         if o.get("is_error"):
             detail = o.get("result") or "; ".join(map(str, o.get("errors") or [])) or o.get("subtype")
@@ -250,8 +260,13 @@ def _parse_antigravity(o):
     step = o.get("step_update") or {}
     if kind != "step_update":
         return []
-    if step.get("step_type") == "agent_response" and step.get("text_delta"):
-        return [("text", step["text_delta"])]
+    if step.get("step_type") == "agent_response":
+        events = [("text", step["text_delta"])] if step.get("text_delta") else []
+        usage = step.get("usage") or {}
+        if step.get("state") == "DONE" and usage:
+            events.append(("usage", {"call": f"{step.get('conversation_id')}:{step.get('step_index')}",
+                                     "model": None, "context": usage.get("input_tokens") or 0}))
+        return events
     if step.get("step_type") == "tool" and step.get("state") == "ACTIVE":
         info = step.get("tool_info") or {}
         return [("break", None), ("activity", _tool_summary(step.get("tool_name"), info.get("parameters")))]

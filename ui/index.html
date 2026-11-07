@@ -47,6 +47,15 @@ header img{height:30px;width:30px}
 .err{color:var(--danger);white-space:pre-wrap;font-size:13.5px}
 .note{color:var(--dim);font-size:12.5px;font-style:italic}
 .acts{font:12px Consolas,monospace;color:var(--dim);margin-top:5px}
+.usage{margin-left:auto;font-size:11.5px}.usage.big{color:var(--haiku)}
+.ctxwarn{margin-top:7px;padding:6px 9px;border:1px solid var(--haiku);border-radius:7px;font-size:12.5px;color:var(--haiku);display:flex;gap:10px;align-items:center}
+.ctxwarn button{font-size:12px;padding:1px 9px;white-space:nowrap}
+#debatebtn{border-color:var(--haiku);color:var(--haiku);height:42px}
+#debdlg textarea{width:100%;box-sizing:border-box;min-height:70px;max-height:30vh;resize:vertical}
+#debdlg input[type=number]{width:60px}
+#debdlg select{min-width:150px}
+#debparts{display:flex;flex-wrap:wrap;gap:4px 14px}
+#deborder{color:var(--dim);font-size:13px;margin-top:4px}
 .acts div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .typing::after{content:"pracuje…";color:var(--dim);font-size:13px;animation:p 1.4s infinite}
 @keyframes p{50%{opacity:.35}}
@@ -129,6 +138,7 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
     <button id="attach" title="Załącz plik lub obraz (obraz możesz też wkleić przez Ctrl+V)">Załącz</button>
     <textarea id="input" rows="1" placeholder="Napisz wiadomość albo: @codex …, @claude @agy …, @wszyscy …, @haiku …"></textarea>
     <button id="refine" title="Przepisz tekst na dobry prompt (Alt+P)">Prompter</button>
+    <button id="debatebtn" title="Debata modeli: rundy, kolejność, uczestnicy i kto wdraża">Debata</button>
     <button id="sendbtn">Wyślij</button>
   </div>
 </div></footer>
@@ -145,6 +155,20 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <div id="remoteerr" class="err"></div>
   <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex, Antigravity i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
   <menu style="gap:8px"><button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button><button id="remoteclose" type="button">Zamknij</button><button id="remotetoggle" type="button"></button></menu>
+</dialog>
+<dialog id="debdlg">
+  <h3>Debata modeli</h3>
+  <textarea id="debtopic" placeholder="Temat debaty, np. jak uprościć odejmowanie w grze"></textarea>
+  <fieldset><legend>Kto bierze udział</legend><div id="debparts"></div></fieldset>
+  <label>Liczba rund <input id="debrounds" type="number" min="1" max="10" value="2"></label>
+  <label>Kto zaczyna <select id="debfirst"></select></label>
+  <label>Kto kończy <select id="deblast"></select></label>
+  <div id="deborder"></div>
+  <label>Kto wdraża po debacie <select id="debimpl"></select></label>
+  <label style="justify-content:flex-start"><input id="debreview" type="checkbox"> Pozostali sprawdzą wdrożenie</label>
+  <div id="deberr" class="err" role="alert"></div>
+  <small id="debnote">Debata działa tylko do odczytu. Wdraża wybrany model po ostatniej rundzie, ze swoimi uprawnieniami. Każda tura zużywa limit danego modelu.</small>
+  <menu style="gap:8px"><button id="debcancel" type="button">Anuluj</button><button id="debgo" type="button">Rozpocznij</button></menu>
 </dialog>
 <dialog id="dlg"><form method="dialog">
   <h3>Ustawienia</h3>
@@ -242,7 +266,11 @@ function label(agent, turn) {
 function userBubble(msg) {
   const span = document.createElement("span");
   const names = msg.targets.map(t => S.agents[t].label).join(", ");
-  span.textContent = msg.debate ? `Ty → debata, ${msg.debate} rund(y): ${names} (tylko odczyt)` : "Ty → " + names;
+  const order = msg.targets.map(t => S.agents[t].label).join(" → ");
+  span.textContent = msg.debate
+    ? `Ty → debata, ${msg.debate} rund(y): ${order} (tylko odczyt)` +
+      (msg.implementer ? ` · wdraża ${S.agents[msg.implementer].label}` : "")
+    : "Ty → " + names;
   const parts = bubble("user", span);
   parts.b.innerHTML = markdown(msg.text);
   addFiles(parts.b, msg.attachments);
@@ -282,6 +310,33 @@ function finish(parts, msg) {
   if (msg.status === "stopped") addLine(parts.b, "note", "Przerwano.");
   if (msg.error) addLine(parts.b, "err", msg.error);
   addFiles(parts.b, msg.images);
+  addUsage(parts, msg);
+}
+const kTokens = n => n >= 1000 ? Math.round(n / 1000) + " tys." : String(n);
+const steps = n => (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) ? " kroki" : " kroków";
+function addUsage(parts, msg) {
+  const u = msg.usage; if (!u) return;
+  const big = u.context >= S.context_warn;
+  const s = document.createElement("span"); s.className = "usage" + (big ? " big" : "");
+  s.textContent = [u.model && u.model.replace(/^claude-/, ""), "kontekst " + kTokens(u.context) + " tokenów",
+                   u.calls > 1 ? u.calls + steps(u.calls) : null].filter(Boolean).join(" · ");
+  s.title = "Kontekst: ile model wczytał w ostatnim kroku. Każdy krok odpowiedzi wczytuje go od nowa i zużywa limit.";
+  parts.w.append(s);
+  if (!big) return;
+  // Only the model's latest reply carries the warning, and only while that long session is still in use.
+  document.querySelectorAll(`.ctxwarn[data-agent="${msg.agent}"]`).forEach(w => w.remove());
+  if (!S.live_sessions.includes(msg.agent)) return;
+  const w = document.createElement("div"); w.className = "ctxwarn"; w.dataset.agent = msg.agent;
+  const t = document.createElement("span");
+  t.textContent = `Sesja ${S.agents[msg.agent].label} jest bardzo duża, więc każda odpowiedź zużywa dużo limitu. ` +
+                  "Świeża sesja dostanie tylko ostatnie wiadomości z czatu.";
+  const b = document.createElement("button"); b.type = "button"; b.textContent = "Świeża sesja";
+  b.onclick = async () => {
+    const r = await api.fresh_session(msg.agent);
+    if (!r.ok) return toast(r.error);
+    S.live_sessions = S.live_sessions.filter(a => a !== msg.agent); w.remove();
+  };
+  w.append(t, b); parts.b.append(w);
 }
 function addLine(parent, cls, text) {
   const d = document.createElement("div"); d.className = cls; d.textContent = text; parent.append(d);
@@ -291,7 +346,7 @@ function render() {
   $("project").textContent = S.project; $("project").title = "Zmień folder: " + S.project;
   if (!S.messages.length) {
     const e = document.createElement("div"); e.className = "empty";
-    e.innerHTML = '<img class="logo" alt="">' + "Wybierz model poniżej albo zacznij od <code>@codex</code>, <code>@claude @agy</code>, <code>@wszyscy</code>.<br>Dyskusja między modelami: <code>@debata 3 @claude @codex temat</code>.<br>Przycisk Prompter przepisze Twój tekst na prompt, zanim go wyślesz.";
+    e.innerHTML = '<img class="logo" alt="">' + "Wybierz model poniżej albo zacznij od <code>@codex</code>, <code>@claude @agy</code>, <code>@wszyscy</code>.<br>Dyskusja między modelami: przycisk <b>Debata</b> albo <code>@debata 2 @claude @codex temat</code>.<br>Przycisk Prompter przepisze Twój tekst na prompt, zanim go wyślesz.";
     $("items").append(e);
     showLogo();
   }
@@ -339,6 +394,7 @@ window.onEvents = events => {
       while (r.acts.children.length > 6) r.acts.firstChild.remove();
     } else if (e.t === "end") {
       const r = runs.get(e.id); if (!r) continue;
+      if (e.message.status !== "error" && !S.live_sessions.includes(e.agent)) S.live_sessions.push(e.agent);
       r.st.remove(); finish(r.parts, e.message); runs.delete(e.id);
     } else if (e.t === "debate_end") {
       addLine($("items"), "note", e.text);
@@ -381,9 +437,75 @@ async function send() {
   if (/^\s*@prompter\b/i.test(text)) { t.value = text.replace(/^\s*@prompter\b[\s,:]*/i, ""); return refine(); }
   const r = await api.send(text, S.settings.target, files.map(f => f.path));
   if (!r.ok) return toast(r.error);
+  if (r.warn) toast(r.warn);
   files = []; drawFiles();
   t.value = ""; original = null; setPrompter(false, null); grow();
 }
+// ---- debate menu ----
+const debAgents = () => shown().filter(([, a]) => a.available).map(([id]) => id);
+const debChecked = () => [...document.querySelectorAll("#debparts input:checked")].map(c => c.dataset.agent);
+function debRemembered() {
+  try { return JSON.parse(localStorage.getItem("debate") || "{}"); } catch (e) { return {}; }
+}
+function debOrder() {
+  const picked = debChecked(), first = $("debfirst").value, last = $("deblast").value;
+  return [first, ...picked.filter(a => a !== first && a !== last), last].filter((a, i, all) => a && all.indexOf(a) === i);
+}
+function debFillSelect(sel, ids, keep) {
+  sel.replaceChildren(...ids.map(id => { const o = document.createElement("option"); o.value = id; o.textContent = S.agents[id].label; return o; }));
+  if (ids.includes(keep)) sel.value = keep;
+}
+function debRefresh(changed) {
+  const picked = debChecked();
+  debFillSelect($("debfirst"), picked, $("debfirst").value);
+  debFillSelect($("deblast"), picked, $("deblast").value || picked[picked.length - 1]);
+  // Starter and closer must differ, or the closer would speak twice in a row.
+  if (picked.length > 1 && $("debfirst").value === $("deblast").value) {
+    const other = picked.find(a => a !== $("debfirst").value);
+    if (changed === "last") $("debfirst").value = picked.find(a => a !== $("deblast").value);
+    else $("deblast").value = [...picked].reverse().find(a => a !== $("debfirst").value) || other;
+  }
+  const order = debOrder();
+  $("deborder").textContent = order.length > 1 ? "Kolejność w każdej rundzie: " + order.map(a => S.agents[a].label).join(" → ") : "";
+  const impl = $("debimpl").value;
+  $("debreview").disabled = !impl;
+  if (!impl) $("debreview").checked = false;
+  $("deberr").textContent = impl && (S.settings.modes[impl] || "read") === "read"
+    ? `${S.agents[impl].label} ma uprawnienia „Tylko odczyt”: zmień je na górze okna, żeby mógł wdrażać.` : "";
+}
+function openDebate() {
+  const saved = debRemembered(), ids = debAgents();
+  const defaults = (saved.agents || S.settings.everyone).filter(a => ids.includes(a));
+  $("debparts").replaceChildren(...ids.map(id => {
+    const l = document.createElement("label"), c = document.createElement("input");
+    c.type = "checkbox"; c.dataset.agent = id; c.checked = defaults.includes(id); c.onchange = () => debRefresh();
+    l.append(c, S.agents[id].label); return l;
+  }));
+  $("debtopic").value = $("input").value.replace(/^\s*@(debata|debate)\b[\s,:]*/i, "");
+  $("debrounds").value = saved.rounds || 2;
+  const impl = $("debimpl");
+  impl.replaceChildren(new Option("Nikt (tylko rozmowa)", ""), ...ids.map(id => new Option(S.agents[id].label, id)));
+  impl.value = ids.includes(saved.implementer) ? saved.implementer : "";
+  $("debfirst").value = ""; $("deblast").value = "";
+  debRefresh();
+  if (defaults.includes(saved.first)) { $("debfirst").value = saved.first; debRefresh("first"); }
+  if (defaults.includes(saved.last)) { $("deblast").value = saved.last; debRefresh("last"); }
+  $("debreview").checked = !!saved.review && !!impl.value;
+  $("debdlg").showModal(); $("debtopic").focus();
+}
+async function startDebate() {
+  const plan = {topic: $("debtopic").value.trim(), agents: debOrder(), rounds: +$("debrounds").value,
+                implementer: $("debimpl").value || null, review: $("debreview").checked,
+                attachments: files.map(f => f.path)};
+  const r = await api.debate(plan);
+  if (!r.ok) { $("deberr").textContent = r.error; return; }
+  try { localStorage.setItem("debate", JSON.stringify({agents: plan.agents, rounds: plan.rounds, first: plan.agents[0],
+        last: plan.agents[plan.agents.length - 1], implementer: plan.implementer, review: plan.review})); } catch (e) {}
+  $("debdlg").close();
+  files = []; drawFiles(); $("input").value = ""; grow();
+  if (r.warn) toast(r.warn);
+}
+
 async function refine() {
   const text = $("input").value;
   original = text;
@@ -540,6 +662,12 @@ window.addEventListener("pywebviewready", async () => {
   };
   $("settings").onclick = () => { fillSettings(); $("dlg").showModal(); drawLimits(); };
   $("limitsrefresh").onclick = drawLimits;
+  $("debatebtn").onclick = openDebate;
+  $("debcancel").onclick = () => $("debdlg").close();
+  $("debgo").onclick = startDebate;
+  $("debfirst").onchange = () => debRefresh("first");
+  $("deblast").onchange = () => debRefresh("last");
+  $("debimpl").onchange = () => debRefresh();
   $("dlg").addEventListener("close", async () => {
     const models = {};
     document.querySelectorAll("#models input").forEach(i => { if (i.value.trim()) models[i.dataset.agent] = i.value.trim(); });

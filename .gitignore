@@ -5,6 +5,6 @@ __pycache__/
 *.spec
 .trybunai/
 *.exe
-.claude/settings.local.json
+.claude/
 _ui check/
 _name check/

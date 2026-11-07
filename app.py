@@ -85,6 +85,12 @@ class Api:
     def limits(self):
         return self._session.limits()
 
+    def debate(self, plan):
+        return self._session.start_debate(plan if isinstance(plan, dict) else {})
+
+    def fresh_session(self, agent):
+        return self._session.fresh_session(agent)
+
     def pick_attachments(self):
         picked = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
         return [self._session.attach_file(path) for path in picked or []]

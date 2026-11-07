@@ -187,6 +187,22 @@ class Pure(unittest.TestCase):
         self.assertEqual(ev({"event": "result", "result": {"status": "ERROR", "error": "brak limitu"}}),
                          [("fatal", "brak limitu")])
 
+    def test_claude_reports_context_size_and_skips_skills(self):
+        self.assertIn("--disable-slash-commands", build_command("claude", "c", "read"))
+        event = {"type": "assistant", "message": {"id": "m1", "model": "claude-sonnet-5", "content": [
+            {"type": "tool_use", "name": "Read", "input": {"file_path": "a.html"}}],
+            "usage": {"input_tokens": 2, "cache_creation_input_tokens": 1000, "cache_read_input_tokens": 437000}}}
+        self.assertEqual(parse_event("claude", event),
+                         [("activity", "Read: a.html"), ("usage", {"call": "m1", "model": "claude-sonnet-5",
+                                                                   "context": 438002})])
+        result = core._Result()
+        session = Session.__new__(Session)
+        for kind, value in parse_event("claude", event) + parse_event("claude", event):
+            if kind == "usage":
+                Session._apply(session, kind, value, result, "r")
+        self.assertEqual(result.usage(), {"model": "claude-sonnet-5", "context": 438002, "calls": 1},
+                         "one call split over two events counts once")
+
     def test_limits_from_each_cli(self):
         usage = ("Gemini Models\tWeekly Limit Remaining\t91%\t2026-11-09T19:43:39Z\n"
                  "Claude and GPT models\tWeekly Limit Remaining\t100%\t2026-11-09T19:57:02Z\n")
@@ -353,6 +369,48 @@ class Runs(unittest.TestCase):
         self.assertEqual([m["label"] for m in replies], ["runda 1/2", "runda 1/2", "runda 2/2", "runda 2/2"])
         self.assertFalse(self.session._busy)
         self.assertTrue(any(e["t"] == "debate_end" and "zakończona" in e["text"] for e in self.events))
+
+    def menu_debate(self, plan):
+        calls = []
+        def fake(agent, exe, mode, *a, **k):
+            calls.append((agent, mode))
+            return [sys.executable, str(self.dir / "fake.py")]
+        with mock.patch.object(core, "build_command", fake):
+            result = self.session.start_debate(plan)
+            self.wait_idle()
+        return result, calls
+
+    def test_menu_debate_order_then_implement_then_review(self):
+        self.session.update_settings({"modes": {"claude": "full"}})
+        result, calls = self.menu_debate({"topic": "plan gry", "agents": ["codex", "gemini", "claude"], "rounds": 2,
+                                          "implementer": "claude", "review": True})
+        self.assertTrue(result["ok"])
+        self.assertEqual(calls, [("codex", "read"), ("gemini", "read"), ("claude", "read")] * 2 +
+                         [("claude", "full"), ("codex", "read"), ("gemini", "read")],
+                         "speaking order as chosen, implementer with its own rights, reviewers read-only")
+        labels = [m.get("label") for m in self.session.messages if m["role"] == "assistant"]
+        self.assertEqual(labels[-3:], ["wdrożenie", "sprawdzenie", "sprawdzenie"])
+        self.assertEqual(self.session.messages[0]["implementer"], "claude")
+        self.assertTrue(any(e["t"] == "debate_end" and "sprawdzili" in e["text"] for e in self.events))
+
+    def test_menu_debate_refuses_read_only_implementer_and_warns_without_one(self):
+        result, calls = self.menu_debate({"topic": "x", "agents": ["claude", "codex"], "implementer": "codex"})
+        self.assertFalse(result["ok"])
+        self.assertIn("Tylko odczyt", result["error"])
+        self.assertEqual(calls, [])
+        result, _ = self.menu_debate({"topic": "wdróż poprawki", "agents": ["claude", "codex"], "rounds": 1})
+        self.assertTrue(result["ok"])
+        self.assertIn("tylko do odczytu", result["warn"])
+
+    def test_fresh_session_replays_recent_chat_including_own_replies(self):
+        self.session.send("@gemini pierwsze", "claude")
+        self.wait_idle()
+        self.assertTrue(self.session.fresh_session("gemini")["ok"])
+        self.session.send("@gemini drugie", "claude")
+        self.wait_idle()
+        prompt = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("odp zażółć", prompt, "a fresh session does not remember its own reply")
+        self.assertIn("pierwsze", prompt)
 
     def test_debater_sees_previous_speaker_once(self):
         self.debate("@debata 1 @claude @codex temat-xyz")
