@@ -123,11 +123,20 @@ def _speaker(msg):
     return AGENTS[msg["agent"]]["label"]
 
 
-def build_turn_prompt(messages, agent_id, text, include_own=False):
+def build_turn_prompt(messages, agent_id, text, include_own=False, memory=""):
     """Prepend whatever this agent has not seen, so all models share one conversation.
 
-    A model normally remembers its own replies; a fresh session (include_own) does not.
+    A model normally remembers its own replies; a fresh session (include_own) does not,
+    and starts from the project memory instead of the whole history.
     """
+    prompt = _chat_context(messages, agent_id, text, include_own)
+    if memory.strip():
+        prompt = ("Pamięć projektu (ustalenia z wcześniejszej pracy, prowadzona przez TrybunAI):\n"
+                  f"<pamiec_projektu>\n{memory.strip()}\n</pamiec_projektu>\n\n{prompt}")
+    return prompt
+
+
+def _chat_context(messages, agent_id, text, include_own):
     lines, total = [], 0
     for msg in reversed(messages):
         if (msg.get("agent") == agent_id and not include_own) or not msg.get("text"):
@@ -171,6 +180,46 @@ Brakujące decyzje zostaw agentowi albo zaznacz jako pytanie w prompcie.
 <surowa_wypowiedz>
 {raw}
 </surowa_wypowiedz>"""
+
+
+MEMORY_FILE = "pamiec.md"
+MEMORY_LIMIT = 6_000  # characters; the memory replaces a session of hundreds of thousands of tokens
+MEMORY_SOURCE = 60_000  # characters of chat the summarizer reads
+
+
+def build_memory_prompt(old_memory, messages, project):
+    """The summarizer reads the chat, not the models' sessions, so it never pays for their size."""
+    lines, total = [], 0
+    for msg in reversed(messages):
+        if not msg.get("text"):
+            continue
+        line = f"[{_speaker(msg)}]\n{msg['text']}"
+        if total + len(line) > MEMORY_SOURCE:
+            break
+        lines.append(line)
+        total += len(line)
+    chat = "\n\n".join(reversed(lines))
+    old = old_memory.strip() or "(pusta)"
+    return f"""Prowadzisz pamięć projektu w folderze {project}. Modele AI pracujące nad projektem dostaną ją \
+na starcie nowej sesji zamiast całej dotychczasowej rozmowy, więc musi wystarczyć do kontynuowania pracy.
+
+Obecna pamięć:
+<pamiec>
+{old}
+</pamiec>
+
+Najnowsza część rozmowy:
+<czat>
+{chat}
+</czat>
+
+Napisz zaktualizowaną pamięć. Zasady:
+- Po polsku, zwięźle, maksymalnie około 600 słów. Krótkie punkty pod nagłówkami:
+  Cel projektu; Ustalenia i decyzje (z uzasadnieniem w kilku słowach); Stan prac (co już zrobione, \
+w jakich plikach); Otwarte sprawy i następne kroki; Preferencje użytkownika.
+- Nowsze ustalenia zastępują starsze. Usuń to, co nieaktualne. Nie powtarzaj przebiegu dyskusji.
+- Tylko fakty z pamięci i rozmowy, niczego nie zmyślaj. Ścieżki plików i nazwy zapisuj dokładnie.
+- Zwróć wyłącznie treść pamięci, bez wstępu i bez bloku kodu dookoła."""
 
 
 def clean_prompter_output(text):
@@ -281,6 +330,8 @@ class Session:
             if any(a not in AGENTS for a in new["everyone"]):
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
             if any(m not in MODES for m in new["modes"].values()) or new["target"] not in AGENTS or new["prompter"] not in AGENTS:
+                return {"ok": False, "error": "Nieprawidłowe ustawienie."}
+            if not isinstance(new.get("auto_fresh", True), bool):
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
             for model in new.get("models", {}).values():
                 if model and not is_safe_arg(model):
@@ -452,6 +503,10 @@ class Session:
             outcome = f"Debata przerwana: {type(exc).__name__}: {exc}"
         finally:
             with self._lock:
+                big = [a for a in everybody if self._too_big(a)] if self.settings.get("auto_fresh", True) else []
+            if big:
+                self._refresh_sessions(big, True)
+            with self._lock:
                 self._busy.difference_update(everybody)
                 self._busy.discard("debate")
                 self._stop_requested.difference_update(everybody)
@@ -465,14 +520,14 @@ class Session:
         return self._run_turn(agent, body, count, mode=mode, keep_busy=True, turn_label=label)
 
     def fresh_session(self, agent):
-        """Forget a model's own long session; it gets the recent chat as context instead."""
+        """Replace a model's long session with the project memory and the latest exchange."""
         with self._lock:
             if agent not in AGENTS:
                 return {"ok": False, "error": "Nieznany model."}
             if agent in self._busy:
                 return {"ok": False, "error": f"{AGENTS[agent]['label']} jeszcze pracuje."}
-            self.sessions[agent] = {"seen": 0}
-            self.save()
+            self._busy.add(agent)
+        threading.Thread(target=self._refresh_sessions, args=([agent], False), daemon=True).start()
         return {"ok": True}
 
     def _run_turn(self, agent, body, count, attachments=(), mode=None, keep_busy=False, turn_label=None):
@@ -492,7 +547,9 @@ class Session:
             if attachments:
                 body += "\n\nZałączone pliki (ścieżki względem folderu projektu):\n" + \
                     "\n".join(f"- {a}" for a in attachments)
-            prompt = build_turn_prompt(unseen, agent, body, include_own=not state.get("id"))
+            fresh = not state.get("id")
+            prompt = build_turn_prompt(unseen, agent, body, include_own=fresh,
+                                       memory=self.read_memory() if fresh else "")
             images = [self._attachment_path(a) for a in attachments
                       if a.lower().endswith(IMAGE_SUFFIXES)] if agent == "codex" else []
             name = session_name(self.project.name, "" if agent == "claude" else agent)
@@ -524,10 +581,89 @@ class Session:
                 msg["label"] = turn_label
             self.messages.append(msg)
             self.save()  # before "not busy": whoever sees the agent free must also see the file
-            if not keep_busy:
+            # A huge session makes every later step expensive: hand over to the memory instead.
+            refresh = (not keep_busy and status == "ok" and self._too_big(agent)
+                       and self.settings.get("auto_fresh", True))
+            if not keep_busy and not refresh:
                 self._busy.discard(agent)
         self.emit({"t": "end", "id": run_id, "agent": agent, "message": msg})
+        if refresh:  # the agent stays busy until its session is replaced
+            threading.Thread(target=self._refresh_sessions, args=([agent], True), daemon=True).start()
         return status
+
+    def _too_big(self, agent):
+        """Under the lock. True when the agent's latest reply came from an oversized live session."""
+        if not (self.sessions.get(agent) or {}).get("id"):
+            return False
+        last = next((m for m in reversed(self.messages) if m.get("agent") == agent), None)
+        return bool(last and (last.get("usage") or {}).get("context", 0) >= CONTEXT_WARN)
+
+    # ---- project memory --------------------------------------------------
+    @property
+    def _memory_path(self):
+        return self.project / STATE_DIR / MEMORY_FILE
+
+    def read_memory(self):
+        try:
+            return self._memory_path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
+    def write_memory(self, text):
+        text = str(text or "").strip()[:MEMORY_LIMIT * 2]
+        with self._lock:
+            folder = self._memory_path.parent
+            folder.mkdir(exist_ok=True)
+            ignore = folder / ".gitignore"
+            if not ignore.exists():
+                ignore.write_text("*\n", encoding="utf-8")
+            self._memory_path.write_text(text + "\n" if text else "", encoding="utf-8")
+        return {"ok": True}
+
+    def _update_memory(self):
+        """Ask the prompter engine (Haiku by default) to fold the recent chat into the memory.
+        Returns an error text or None."""
+        with self._lock:
+            engine = self.settings["prompter"]
+            exe = self._binaries.get(engine)
+            model = self.settings["models"].get(engine) or None
+            messages = list(self.messages)
+        if not exe:
+            return f"Nie znaleziono CLI: {AGENTS[engine]['label']}."
+        prompt = build_memory_prompt(self.read_memory(), messages, self.project)
+        cmd = build_command(engine, exe, "read", None, model, prompter=True)
+        result = self._execute("memory", engine, cmd, prompt, "memory")
+        text = clean_prompter_output(result.text)
+        if not result.ok or not text:
+            return result.error_message() if not result.ok else "Model zwrócił pustą pamięć."
+        self.write_memory(text[:MEMORY_LIMIT * 2])
+        return None
+
+    def _refresh_sessions(self, agents, automatic):
+        """Update the memory, then start the agents over from it. The agents are busy throughout."""
+        labels = ", ".join(AGENTS[a]["label"] for a in agents)
+        self.emit({"t": "note", "text": f"Aktualizuję pamięć projektu i odświeżam sesję: {labels}…"})
+        error = None
+        try:
+            error = self._update_memory()
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+        with self._lock:
+            reset = []
+            # Without a memory an automatic reset would lose work, so it waits for the next time.
+            if not error or not automatic:
+                for agent in agents:
+                    # The last exchange is replayed too, so the thread continues naturally.
+                    self.sessions[agent] = {"seen": max(0, len(self.messages) - 2)}
+                    reset.append(agent)
+                self.save()
+            self._busy.difference_update(agents)
+        if error:
+            text = f"Nie udało się zaktualizować pamięci projektu: {error}"
+            text += " Sesję odświeżono bez niej." if reset else " Sesja zostaje bez zmian."
+        else:
+            text = f"Zapisano pamięć projektu. {labels}: świeża sesja startuje od pamięci i ostatniej wymiany."
+        self.emit({"t": "fresh", "agents": reset, "text": text})
 
     # ---- remote control --------------------------------------------------
     def remote_start(self):

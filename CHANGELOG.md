@@ -1,5 +1,14 @@
 # Zmiany
 
+## 1.0.8 — 2026-11-07
+- Pamięć projektu (`.trybunai/pamiec.md`): zwięzłe ustalenia, stan prac i preferencje. Każda nowa
+  sesja modelu (także po „Nowa rozmowa”) startuje od niej zamiast od całej historii.
+- „Świeża sesja” najpierw aktualizuje pamięć (robi to model Promptera, domyślnie Haiku, z tekstu czatu),
+  potem zastępuje długą sesję modelu pamięcią i ostatnią wymianą.
+- Automatyczna świeża sesja po przekroczeniu 150 tys. tokenów kontekstu (domyślnie włączona,
+  wyłącznik w Ustawieniach). Gdy pamięci nie uda się zaktualizować, sesja zostaje bez zmian.
+- Pamięć widoczna i edytowalna w Ustawieniach.
+
 ## 1.0.7 — 2026-11-07
 - Menu debaty (przycisk „Debata”): temat, uczestnicy, liczba rund, kto zaczyna, kto kończy,
   kto wdraża po debacie (ze swoimi uprawnieniami) i opcjonalne sprawdzenie wdrożenia przez pozostałych.

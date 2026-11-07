@@ -98,6 +98,7 @@ dialog fieldset label{justify-content:flex-start;margin:5px 0}
 dialog small{color:var(--dim);display:block;margin-top:9px}
 dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 #dlg{width:470px;max-height:90vh}
+#memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:12.5px;margin-top:4px}
 #limits .acct{margin:8px 0 10px}
 #limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
 #limits .win{margin:5px 0 0;font-size:12.5px}
@@ -176,6 +177,11 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
   <div id="models"></div>
   <small>Puste pole modelu oznacza domyślny model danego CLI. Ustawienia są zapisywane w folderze projektu.</small>
+  <fieldset id="memorybox"><legend>Pamięć projektu</legend>
+    <textarea id="memory" placeholder="Pusta. Zapełni się przy pierwszej świeżej sesji."></textarea>
+    <label style="justify-content:flex-start"><input id="autofresh" type="checkbox"> Świeża sesja automatycznie, gdy kontekst modelu przekroczy 150 tys. tokenów</label>
+    <small>Nowa sesja modelu (także po „Nowa rozmowa”) dostaje tę pamięć zamiast całej historii. Aktualizuje ją model wybrany jako Prompter, na podstawie czatu. Możesz ją tu poprawić.</small>
+  </fieldset>
   <fieldset id="limitsbox"><legend>Plany i limity</legend>
     <div id="limits" role="status"></div>
     <button id="limitsrefresh" type="button">Odśwież</button>
@@ -329,12 +335,12 @@ function addUsage(parts, msg) {
   const w = document.createElement("div"); w.className = "ctxwarn"; w.dataset.agent = msg.agent;
   const t = document.createElement("span");
   t.textContent = `Sesja ${S.agents[msg.agent].label} jest bardzo duża, więc każda odpowiedź zużywa dużo limitu. ` +
-                  "Świeża sesja dostanie tylko ostatnie wiadomości z czatu.";
+                  "Świeża sesja zacznie od pamięci projektu i ostatniej wymiany.";
   const b = document.createElement("button"); b.type = "button"; b.textContent = "Świeża sesja";
   b.onclick = async () => {
     const r = await api.fresh_session(msg.agent);
     if (!r.ok) return toast(r.error);
-    S.live_sessions = S.live_sessions.filter(a => a !== msg.agent); w.remove();
+    b.disabled = true; b.textContent = "Aktualizuję pamięć…";  // the "fresh" event removes the warning
   };
   w.append(t, b); parts.b.append(w);
 }
@@ -396,8 +402,12 @@ window.onEvents = events => {
       const r = runs.get(e.id); if (!r) continue;
       if (e.message.status !== "error" && !S.live_sessions.includes(e.agent)) S.live_sessions.push(e.agent);
       r.st.remove(); finish(r.parts, e.message); runs.delete(e.id);
-    } else if (e.t === "debate_end") {
+    } else if (e.t === "debate_end" || e.t === "note") {
       addLine($("items"), "note", e.text);
+    } else if (e.t === "fresh") {
+      addLine($("items"), "note", e.text);
+      S.live_sessions = S.live_sessions.filter(a => !e.agents.includes(a));
+      for (const a of e.agents) document.querySelectorAll(`.ctxwarn[data-agent="${a}"]`).forEach(w => w.remove());
     } else if (e.t === "remote") {
       S.remote = e; drawRemote();
     } else if (e.t === "setup") {
@@ -660,7 +670,12 @@ window.addEventListener("pywebviewready", async () => {
     if (!r.ok) return addLine($("setuplog"), "err", r.error);
     $("setupgo").disabled = true; $("setupclose").disabled = true;
   };
-  $("settings").onclick = () => { fillSettings(); $("dlg").showModal(); drawLimits(); };
+  $("settings").onclick = async () => {
+    fillSettings(); $("autofresh").checked = S.settings.auto_fresh !== false;
+    const mem = $("memory"); mem.dataset.loaded = "0"; mem.value = "";
+    $("dlg").showModal(); drawLimits();
+    mem.value = await api.get_memory(); mem.dataset.original = mem.value; mem.dataset.loaded = "1";
+  };
   $("limitsrefresh").onclick = drawLimits;
   $("debatebtn").onclick = openDebate;
   $("debcancel").onclick = () => $("debdlg").close();
@@ -672,9 +687,11 @@ window.addEventListener("pywebviewready", async () => {
     const models = {};
     document.querySelectorAll("#models input").forEach(i => { if (i.value.trim()) models[i.dataset.agent] = i.value.trim(); });
     const everyone = [...document.querySelectorAll("#everyone input:checked")].map(c => c.dataset.agent);
-    const changes = {prompter: $("engine").value, models, everyone};
+    const changes = {prompter: $("engine").value, models, everyone, auto_fresh: $("autofresh").checked};
     const r = await api.update_settings(changes);
     if (r.ok) Object.assign(S.settings, changes); else toast(r.error);
+    if ($("memory").dataset.loaded === "1" && $("memory").value !== $("memory").dataset.original)
+      await api.set_memory($("memory").value);
   });
   $("log").addEventListener("click", e => {
     const a = e.target.closest("a");

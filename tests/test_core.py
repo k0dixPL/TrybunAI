@@ -402,15 +402,57 @@ class Runs(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertIn("tylko do odczytu", result["warn"])
 
-    def test_fresh_session_replays_recent_chat_including_own_replies(self):
+    def test_fresh_session_starts_from_memory_and_last_exchange(self):
         self.session.send("@gemini pierwsze", "claude")
         self.wait_idle()
         self.assertTrue(self.session.fresh_session("gemini")["ok"])
+        self.wait_idle()
+        summary = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("pierwsze", summary, "the summarizer reads the chat")
+        self.assertEqual(self.session.read_memory().strip(), "odp zażółć")
+        self.assertEqual(self.session.sessions["gemini"], {"seen": 0})
+        self.assertTrue(any(e["t"] == "fresh" and e["agents"] == ["gemini"] for e in self.events))
         self.session.send("@gemini drugie", "claude")
         self.wait_idle()
         prompt = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
-        self.assertIn("odp zażółć", prompt, "a fresh session does not remember its own reply")
-        self.assertIn("pierwsze", prompt)
+        self.assertIn("<pamiec_projektu>\nodp zażółć", prompt)
+        self.assertIn("pierwsze", prompt, "the last exchange is replayed, own reply included")
+        self.session.new_chat()
+        self.session.send("@gemini po nowej rozmowie", "claude")
+        self.wait_idle()
+        self.assertIn("pamiec_projektu", (self.dir / "last_prompt.txt").read_text(encoding="utf-8"),
+                      "the memory outlives a new chat")
+
+    def big_context(self):
+        def parse(agent, obj):
+            events = parse_event("gemini", obj)
+            if obj.get("type") == "result":
+                events.append(("usage", {"call": "c", "model": None, "context": core.CONTEXT_WARN + 1}))
+            return events
+        return mock.patch.object(core, "parse_event", parse)
+
+    def test_oversized_session_is_replaced_automatically(self):
+        with self.big_context():
+            self.session.send("@gemini duża sesja", "claude")
+            self.wait_idle()
+        self.assertEqual(self.session.read_memory().strip(), "odp zażółć")
+        self.assertNotIn("id", self.session.sessions["gemini"])
+        self.assertEqual(self.session.messages[-1]["usage"]["context"], core.CONTEXT_WARN + 1)
+
+    def test_auto_refresh_can_be_off_and_keeps_session_when_memory_fails(self):
+        self.session.update_settings({"auto_fresh": False})
+        with self.big_context():
+            self.session.send("@gemini duża sesja", "claude")
+            self.wait_idle()
+        self.assertEqual(self.session.sessions["gemini"]["id"], "abc-123")
+        self.session.update_settings({"auto_fresh": True})
+        self.session._binaries["haiku"] = None  # the summarizer cannot run
+        with self.big_context():
+            self.session.send("@gemini znowu", "claude")
+            self.wait_idle()
+        self.assertEqual(self.session.sessions["gemini"]["id"], "abc-123", "no memory, so no automatic reset")
+        self.assertTrue(any(e["t"] == "fresh" and "Nie udało się" in e["text"] for e in self.events))
+        self.assertFalse(self.session.update_settings({"auto_fresh": "tak"})["ok"])
 
     def test_debater_sees_previous_speaker_once(self):
         self.debate("@debata 1 @claude @codex temat-xyz")
