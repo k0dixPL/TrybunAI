@@ -1,5 +1,13 @@
 # Zmiany
 
+## 1.0.9 — 2026-11-08
+- Pamięć projektu ma sekcję „Nie ruszać”: rzeczy ustalone przez użytkownika, które łatwo przypadkiem
+  zepsuć. Aktualizacja pamięci przenosi je bez zmian, a modele traktują je jak twarde zasady.
+- „Zapisz stan teraz” w Ustawieniach: aktualizuje pamięć bez resetowania sesji (np. przed przejściem
+  na inny komputer).
+- „Nowa rozmowa” najpierw zapisuje stan do pamięci, potem archiwizuje czat. Nieudany zapis nie blokuje
+  nowej rozmowy, tylko pokazuje ostrzeżenie.
+
 ## 1.0.8 — 2026-11-07
 - Pamięć projektu (`.trybunai/pamiec.md`): zwięzłe ustalenia, stan prac i preferencje. Każda nowa
   sesja modelu (także po „Nowa rozmowa”) startuje od niej zamiast od całej historii.

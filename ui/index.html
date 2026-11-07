@@ -178,9 +178,10 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <div id="models"></div>
   <small>Puste pole modelu oznacza domyślny model danego CLI. Ustawienia są zapisywane w folderze projektu.</small>
   <fieldset id="memorybox"><legend>Pamięć projektu</legend>
-    <textarea id="memory" placeholder="Pusta. Zapełni się przy pierwszej świeżej sesji."></textarea>
+    <textarea id="memory" placeholder="Pusta. Zapełni się przy pierwszej świeżej sesji, nowej rozmowie albo po kliknięciu „Zapisz stan teraz”."></textarea>
+    <button id="savestate" type="button">Zapisz stan teraz</button> <span id="savestateerr" class="err"></span>
     <label style="justify-content:flex-start"><input id="autofresh" type="checkbox"> Świeża sesja automatycznie, gdy kontekst modelu przekroczy 150 tys. tokenów</label>
-    <small>Nowa sesja modelu (także po „Nowa rozmowa”) dostaje tę pamięć zamiast całej historii. Aktualizuje ją model wybrany jako Prompter, na podstawie czatu. Możesz ją tu poprawić.</small>
+    <small>Nowa sesja modelu (także po „Nowa rozmowa”) dostaje tę pamięć zamiast całej historii. Aktualizuje ją model wybrany jako Prompter, na podstawie czatu: przy świeżej sesji, przy nowej rozmowie i po kliknięciu „Zapisz stan teraz” (np. przed przejściem na inny komputer). Sekcję „Nie ruszać” modele traktują jak twarde zasady. Możesz ją tu poprawić.</small>
   </fieldset>
   <fieldset id="limitsbox"><legend>Plany i limity</legend>
     <div id="limits" role="status"></div>
@@ -650,9 +651,13 @@ window.addEventListener("pywebviewready", async () => {
     if (r.ok) await reload(); else if (r.error) toast(r.error);
   };
   $("newchat").onclick = async () => {
-    if (!confirm("Zacząć nową rozmowę? Obecna zostanie zarchiwizowana w folderze .trybunai.")) return;
+    if (!confirm("Zacząć nową rozmowę? Ustalenia trafią do pamięci projektu, a rozmowa do archiwum w folderze .trybunai.")) return;
+    const b = $("newchat"); b.disabled = true; b.textContent = "Zapisuję stan…";
     const r = await api.new_chat();
-    if (r.ok) await reload(); else toast(r.error);
+    b.disabled = false; b.textContent = "Nowa rozmowa";
+    if (!r.ok) return toast(r.error);
+    await reload();
+    if (r.warn) toast(r.warn);
   };
   $("remotebtn").onclick = () => $("remotedlg").showModal();
   $("remoteclose").onclick = () => $("remotedlg").close();
@@ -677,6 +682,15 @@ window.addEventListener("pywebviewready", async () => {
     mem.value = await api.get_memory(); mem.dataset.original = mem.value; mem.dataset.loaded = "1";
   };
   $("limitsrefresh").onclick = drawLimits;
+  $("savestate").onclick = async () => {
+    const b = $("savestate"), mem = $("memory");
+    if (mem.value !== mem.dataset.original) await api.set_memory(mem.value);  // keep a manual edit as the base
+    b.disabled = true; b.textContent = "Zapisuję…"; $("savestateerr").textContent = "";
+    const r = await api.save_state();
+    b.disabled = false; b.textContent = "Zapisz stan teraz";
+    mem.value = r.memory; mem.dataset.original = r.memory;
+    if (!r.ok) $("savestateerr").textContent = r.error;
+  };
   $("debatebtn").onclick = openDebate;
   $("debcancel").onclick = () => $("debdlg").close();
   $("debgo").onclick = startDebate;

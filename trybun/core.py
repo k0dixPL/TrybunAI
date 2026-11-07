@@ -131,7 +131,8 @@ def build_turn_prompt(messages, agent_id, text, include_own=False, memory=""):
     """
     prompt = _chat_context(messages, agent_id, text, include_own)
     if memory.strip():
-        prompt = ("Pamięć projektu (ustalenia z wcześniejszej pracy, prowadzona przez TrybunAI):\n"
+        prompt = ("Pamięć projektu (ustalenia z wcześniejszej pracy, prowadzona przez TrybunAI). "
+                  "Punkty z sekcji „Nie ruszać” to twarde zasady: nie zmieniaj ich bez wyraźnej prośby użytkownika.\n"
                   f"<pamiec_projektu>\n{memory.strip()}\n</pamiec_projektu>\n\n{prompt}")
     return prompt
 
@@ -215,8 +216,11 @@ Najnowsza część rozmowy:
 
 Napisz zaktualizowaną pamięć. Zasady:
 - Po polsku, zwięźle, maksymalnie około 600 słów. Krótkie punkty pod nagłówkami:
-  Cel projektu; Ustalenia i decyzje (z uzasadnieniem w kilku słowach); Stan prac (co już zrobione, \
+  Cel projektu; Nie ruszać; Ustalenia i decyzje (z uzasadnieniem w kilku słowach); Stan prac (co już zrobione, \
 w jakich plikach); Otwarte sprawy i następne kroki; Preferencje użytkownika.
+- „Nie ruszać” to miny: rzeczy, które działają albo zostały wyraźnie ustalone przez użytkownika, \
+a łatwo je przypadkiem zepsuć lub cofnąć (np. „misje mają zawsze jedną niewiadomą”). Przenoś je \
+z obecnej pamięci bez zmian. Usuń punkt tylko wtedy, gdy użytkownik wyraźnie zmienił decyzję.
 - Nowsze ustalenia zastępują starsze. Usuń to, co nieaktualne. Nie powtarzaj przebiegu dyskusji.
 - Tylko fakty z pamięci i rozmowy, niczego nie zmyślaj. Ścieżki plików i nazwy zapisuj dokładnie.
 - Zwróć wyłącznie treść pamięci, bez wstępu i bez bloku kodu dookoła."""
@@ -270,6 +274,7 @@ class Session:
     def __init__(self, project, emit, binaries=None):
         self.emit = emit
         self._lock = threading.RLock()
+        self._memory_lock = threading.Lock()
         self._procs = {}
         self._busy = set()
         self._stop_requested = set()
@@ -340,8 +345,17 @@ class Session:
             self.save()
             return {"ok": True}
 
-    def new_chat(self):
-        """Archives the current conversation; nothing is deleted."""
+    def new_chat(self, save_state=True):
+        """Archives the current conversation; nothing is deleted. First the memory takes in
+        what this chat settled, so the next one carries on from it."""
+        with self._lock:
+            if self._busy:
+                return {"ok": False, "error": "Najpierw zatrzymaj działające modele."}
+        warning = None
+        if save_state:
+            saved = self.save_state()
+            if not saved["ok"]:
+                warning = f"Nie udało się zapisać stanu do pamięci projektu: {saved['error']}"
         with self._lock:
             if self._busy:
                 return {"ok": False, "error": "Najpierw zatrzymaj działające modele."}
@@ -350,7 +364,7 @@ class Session:
                 os.replace(self._state_path, self._state_path.with_name(f"chat-{stamp}.json"))
             self.messages, self.sessions = [], {}
             self.save()
-            return {"ok": True}
+            return {"ok": True, "warn": warning}
 
     def set_project(self, path):
         with self._lock:
@@ -620,9 +634,21 @@ class Session:
             self._memory_path.write_text(text + "\n" if text else "", encoding="utf-8")
         return {"ok": True}
 
+    def save_state(self):
+        """Fold the chat into the memory now, without touching any model's session."""
+        with self._lock:
+            if not self.messages:
+                return {"ok": True, "memory": self.read_memory()}
+        error = self._update_memory()
+        return {"ok": not error, "error": error, "memory": self.read_memory()}
+
     def _update_memory(self):
         """Ask the prompter engine (Haiku by default) to fold the recent chat into the memory.
         Returns an error text or None."""
+        with self._memory_lock:  # two updates at once would each overwrite the other's result
+            return self._update_memory_locked()
+
+    def _update_memory_locked(self):
         with self._lock:
             engine = self.settings["prompter"]
             exe = self._binaries.get(engine)

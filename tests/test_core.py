@@ -423,6 +423,29 @@ class Runs(unittest.TestCase):
         self.assertIn("pamiec_projektu", (self.dir / "last_prompt.txt").read_text(encoding="utf-8"),
                       "the memory outlives a new chat")
 
+    def test_save_state_keeps_sessions_and_new_chat_saves_first(self):
+        self.session.send("@gemini ustalamy coś", "claude")
+        self.wait_idle()
+        self.session.write_memory("## Nie ruszać\n- misje mają jedną niewiadomą")
+        result = self.session.save_state()
+        self.assertTrue(result["ok"])
+        prompt = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("misje mają jedną niewiadomą", prompt, "the old memory, mines included, is the base")
+        self.assertIn("Nie ruszać", prompt)
+        self.assertEqual(result["memory"].strip(), "odp zażółć")
+        self.assertEqual(self.session.sessions["gemini"]["id"], "abc-123", "saving state resets nothing")
+        self.session.write_memory("")
+        self.session._binaries["haiku"] = None
+        result = self.session.new_chat()
+        self.assertTrue(result["ok"], "a failed save never blocks a new chat")
+        self.assertIn("Nie udało się", result["warn"])
+        self.assertEqual(self.session.messages, [])
+        self.session._binaries["haiku"] = "x"
+        self.session.send("@gemini hej", "claude")
+        self.wait_idle()
+        self.assertTrue(self.session.new_chat()["ok"])
+        self.assertEqual(self.session.read_memory().strip(), "odp zażółć", "a new chat saves the state first")
+
     def big_context(self):
         def parse(agent, obj):
             events = parse_event("gemini", obj)

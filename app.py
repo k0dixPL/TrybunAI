@@ -94,6 +94,9 @@ class Api:
     def get_memory(self):
         return self._session.read_memory()
 
+    def save_state(self):
+        return self._session.save_state()
+
     def set_memory(self, text):
         return self._session.write_memory(text)
 
