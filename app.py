@@ -97,6 +97,9 @@ class Api:
     def save_state(self):
         return self._session.save_state()
 
+    def model_options(self, refresh=False):
+        return self._session.model_options(refresh)
+
     def set_memory(self, text):
         return self._session.write_memory(text)
 

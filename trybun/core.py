@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import limits, setup
+from . import limits, models, setup
 from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
                      is_safe_arg, parse_event, session_name, stdin_payload)
 from .remote import RemoteControl
@@ -706,6 +706,11 @@ class Session:
         with self._lock:
             binaries = dict(self._binaries)
         return limits.collect(binaries)
+
+    def model_options(self, refresh=False):
+        with self._lock:
+            binaries = dict(self._binaries)
+        return models.collect(binaries, bool(refresh))
 
     # ---- installing the CLIs ---------------------------------------------
     def setup_status(self):

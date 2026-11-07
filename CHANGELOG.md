@@ -1,5 +1,12 @@
 # Zmiany
 
+## 1.0.10 — 2026-11-08
+- Górny pasek: Instalacja, Zdalnie, Ustawienia, Nowa rozmowa. Wybór uprawnień przeniesiony na dół,
+  zaraz za przyciskami modeli, nad polem wiadomości.
+- Ustawienia: model wybierany z listy zamiast wpisywania. Listy z zainstalowanych CLI (Claude: aliasy
+  i dodatkowe modele z jego ustawień, Codex: jego lista modeli, Antigravity: `agy models`), przycisk
+  „Odśwież listy modeli” i opcja „Inny (wpisz)…”.
+
 ## 1.0.9 — 2026-11-08
 - Pamięć projektu ma sekcję „Nie ruszać”: rzeczy ustalone przez użytkownika, które łatwo przypadkiem
   zepsuć. Aktualizacja pamięci przenosi je bez zmian, a modele traktują je jak twarde zasady.

@@ -64,7 +64,10 @@ footer{background:var(--panel);border-top:1px solid var(--line);padding:9px 14px
 #bar.on{display:flex}
 #bar span{flex:1}
 #bar button{padding:1px 9px}
-#chips{display:flex;gap:6px;margin-bottom:7px;align-items:center}
+#chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px;align-items:center}
+#modebox{display:flex;gap:6px;align-items:center;margin-left:10px;padding-left:12px;border-left:1px solid var(--line)}
+#modelabel{color:var(--dim);font-size:13px}
+#mode{font-size:13px;padding:2px 6px}
 .chip{padding:2px 12px;border-radius:15px;font-size:13px}
 .chip.on.claude{background:var(--claude);border-color:var(--claude);color:#14161a}
 .chip.on.codex{background:var(--codex);border-color:var(--codex);color:#14161a}
@@ -98,6 +101,11 @@ dialog fieldset label{justify-content:flex-start;margin:5px 0}
 dialog small{color:var(--dim);display:block;margin-top:9px}
 dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 #dlg{width:470px;max-height:90vh}
+.modelpick{display:flex;gap:6px;align-items:center}
+.modelpick select{width:230px}.modelpick input{width:120px}
+.modelpick:has(input:not([hidden])) select{width:104px}
+#dlg{overflow-x:hidden}
+#modelsrefresh{font-size:12.5px;margin:2px 0}
 #memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:12.5px;margin-top:4px}
 #limits .acct{margin:8px 0 10px}
 #limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
@@ -118,14 +126,8 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <img class="logo" alt="" width="30" height="30">
   <b>TrybunAI</b>
   <button id="project" title="Zmień folder projektu"></button>
-  <label for="mode" id="modelabel" style="color:var(--dim);font-size:13px">Uprawnienia</label>
-  <select id="mode">
-    <option value="read">Tylko odczyt</option>
-    <option value="edit">Edycja plików</option>
-    <option value="full">Pełny dostęp</option>
-  </select>
-  <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
+  <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
   <button id="newchat">Nowa rozmowa</button>
 </header>
@@ -133,7 +135,15 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 <main id="log"><div class="wrap" id="items"></div></main>
 <footer><div class="wrap">
   <div id="bar"><span id="bartext"></span><button id="restore">Przywróć oryginał</button><button id="pstop">Zatrzymaj</button></div>
-  <div id="chips"><span id="hint">Enter: wyślij · Shift+Enter: nowa linia · Alt+P: prompter</span></div>
+  <div id="chips">
+    <span id="modebox"><label for="mode" id="modelabel">Uprawnienia</label>
+      <select id="mode">
+        <option value="read">Tylko odczyt</option>
+        <option value="edit">Edycja plików</option>
+        <option value="full">Pełny dostęp</option>
+      </select></span>
+    <span id="hint">Enter: wyślij · Shift+Enter: nowa linia · Alt+P: prompter</span>
+  </div>
   <div id="files"></div>
   <div id="row">
     <button id="attach" title="Załącz plik lub obraz (obraz możesz też wkleić przez Ctrl+V)">Załącz</button>
@@ -176,7 +186,8 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <label>Prompter używa <select id="engine"></select></label>
   <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
   <div id="models"></div>
-  <small>Puste pole modelu oznacza domyślny model danego CLI. Ustawienia są zapisywane w folderze projektu.</small>
+  <button id="modelsrefresh" type="button">Odśwież listy modeli</button>
+  <small>„Domyślny” to model, który dane CLI wybiera samo. Listy pochodzą z zainstalowanych CLI: Codex odświeża swoją przy każdym uruchomieniu, Antigravity po kliknięciu „Odśwież” (musi być zalogowany). Ustawienia są zapisywane w folderze projektu.</small>
   <fieldset id="memorybox"><legend>Pamięć projektu</legend>
     <textarea id="memory" placeholder="Pusta. Zapełni się przy pierwszej świeżej sesji, nowej rozmowie albo po kliknięciu „Zapisz stan teraz”."></textarea>
     <button id="savestate" type="button">Zapisz stan teraz</button> <span id="savestateerr" class="err"></span>
@@ -367,14 +378,14 @@ function render() {
 const shown = () => Object.entries(S.agents).filter(([, a]) => a.available || !a.optional);
 function drawChips() {
   document.querySelectorAll(".chip").forEach(c => c.remove());
-  const hint = $("hint");
+  const after = $("modebox");  // chips first, then the permission picker for the chosen one
   for (const [id, a] of shown()) {
     const c = document.createElement("button");
     c.type = "button"; c.className = `chip ${id}` + (S.settings.target === id ? " on" : "");
     c.textContent = a.label + (a.available ? "" : " (brak)"); c.disabled = !a.available;
     c.setAttribute("aria-pressed", S.settings.target === id);
     c.onclick = () => { S.settings.target = id; api.update_settings({target: id}); drawChips(); drawMode(); $("input").focus(); };
-    $("chips").insertBefore(c, hint);
+    $("chips").insertBefore(c, after);
   }
 }
 
@@ -604,12 +615,45 @@ function fillSettings() {
     c.type = "checkbox"; c.dataset.agent = id; c.checked = S.settings.everyone.includes(id);
     l.append(c, a.label + (a.available ? "" : " (brak)")); crowd.append(l);
   }
+  drawModelPickers();
+}
+let modelLists = {};
+const CUSTOM = "__custom__";
+function drawModelPickers() {
   const box = $("models"); box.replaceChildren();
   for (const [id, a] of shown()) {
+    const current = S.settings.models[id] || "";
     const l = document.createElement("label"); l.textContent = "Model: " + a.label;
-    const i = document.createElement("input"); i.type = "text"; i.dataset.agent = id;
-    i.value = S.settings.models[id] || ""; i.placeholder = id === "haiku" ? "haiku" : "domyślny"; l.append(i); box.append(l);
+    const wrap = document.createElement("span"); wrap.className = "modelpick";
+    const sel = document.createElement("select"); sel.dataset.agent = id;
+    sel.append(new Option(id === "haiku" ? "domyślny (haiku)" : "domyślny", ""));
+    for (const o of modelLists[id] || []) sel.append(new Option(o.label === o.value ? o.value : `${o.label} (${o.value})`, o.value));
+    sel.append(new Option("Inny (wpisz)…", CUSTOM));
+    const custom = document.createElement("input"); custom.type = "text"; custom.placeholder = "nazwa modelu";
+    const known = [...sel.options].some(o => o.value === current && o.value !== CUSTOM);
+    sel.value = known ? current : CUSTOM;
+    custom.value = known ? "" : current;
+    custom.hidden = sel.value !== CUSTOM;
+    sel.onchange = () => { custom.hidden = sel.value !== CUSTOM; if (!custom.hidden) custom.focus(); };
+    wrap.append(sel, custom); l.append(wrap); box.append(l);
   }
+}
+function chosenModels() {
+  const models = {};
+  document.querySelectorAll("#models .modelpick").forEach(w => {
+    const sel = w.querySelector("select"), value = sel.value === CUSTOM ? w.querySelector("input").value.trim() : sel.value;
+    if (value) models[sel.dataset.agent] = value;
+  });
+  return models;
+}
+async function loadModelLists(refresh) {
+  const b = $("modelsrefresh"); b.disabled = true; b.textContent = refresh ? "Odświeżam…" : "Wczytuję listy…";
+  try {
+    const keep = chosenModels();  // a choice made before the lists arrive must survive the redraw
+    modelLists = await api.model_options(!!refresh);
+    S.settings.models = {...S.settings.models, ...keep};
+    drawModelPickers();
+  } finally { b.disabled = false; b.textContent = "Odśwież listy modeli"; }
 }
 
 window.addEventListener("pywebviewready", async () => {
@@ -678,10 +722,11 @@ window.addEventListener("pywebviewready", async () => {
   $("settings").onclick = async () => {
     fillSettings(); $("autofresh").checked = S.settings.auto_fresh !== false;
     const mem = $("memory"); mem.dataset.loaded = "0"; mem.value = "";
-    $("dlg").showModal(); drawLimits();
+    $("dlg").showModal(); drawLimits(); loadModelLists(false);
     mem.value = await api.get_memory(); mem.dataset.original = mem.value; mem.dataset.loaded = "1";
   };
   $("limitsrefresh").onclick = drawLimits;
+  $("modelsrefresh").onclick = () => loadModelLists(true);
   $("savestate").onclick = async () => {
     const b = $("savestate"), mem = $("memory");
     if (mem.value !== mem.dataset.original) await api.set_memory(mem.value);  // keep a manual edit as the base
@@ -698,8 +743,7 @@ window.addEventListener("pywebviewready", async () => {
   $("deblast").onchange = () => debRefresh("last");
   $("debimpl").onchange = () => debRefresh();
   $("dlg").addEventListener("close", async () => {
-    const models = {};
-    document.querySelectorAll("#models input").forEach(i => { if (i.value.trim()) models[i.dataset.agent] = i.value.trim(); });
+    const models = chosenModels();
     const everyone = [...document.querySelectorAll("#everyone input:checked")].map(c => c.dataset.agent);
     const changes = {prompter: $("engine").value, models, everyone, auto_fresh: $("autofresh").checked};
     const r = await api.update_settings(changes);

@@ -1,6 +1,7 @@
 """Offline tests. Real CLIs are replaced by a small script speaking each JSONL dialect."""
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -10,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from trybun import core, limits, setup  # noqa: E402
+from trybun import core, limits, models, setup  # noqa: E402
 from trybun.agents import (build_command, build_remote_command, parse_event, session_name,  # noqa: E402
                            stdin_payload)
 from trybun.remote import RemoteControl  # noqa: E402
@@ -202,6 +203,28 @@ class Pure(unittest.TestCase):
                 Session._apply(session, kind, value, result, "r")
         self.assertEqual(result.usage(), {"model": "claude-sonnet-5", "context": 438002, "calls": 1},
                          "one call split over two events counts once")
+
+    def test_model_lists_from_each_cli(self):
+        with tempfile.TemporaryDirectory() as home:
+            Path(home, ".claude.json").write_text(json.dumps({
+                "additionalModelOptionsCache": [{"value": "claude-fable-5-1[1m]", "label": "Fable"}],
+                "lastModelUsage": {"claude-sonnet-5": {}, "gpt-x": {}}}), encoding="utf-8")
+            Path(home, ".codex").mkdir()
+            Path(home, ".codex", "models_cache.json").write_text(json.dumps({"models": [
+                {"slug": "gpt-reserve", "display_name": "GPT-Reserve", "visibility": "hide", "priority": 0},
+                {"slug": "gpt-5.6-terra", "display_name": "GPT-5.6-Terra", "visibility": "list", "priority": 2},
+                {"slug": "gpt-6-luna", "display_name": "GPT-6-Luna", "visibility": "list", "priority": 1}]}),
+                encoding="utf-8")
+            claude = [o["value"] for o in models.claude(home)]
+            self.assertEqual(claude, ["sonnet", "opus", "haiku", "claude-fable-5-1[1m]", "claude-sonnet-5"])
+            self.assertEqual([o["value"] for o in models.codex(home)], ["gpt-6-luna", "gpt-5.6-terra"],
+                             "hidden models are left out, the order follows Codex")
+        self.assertEqual(models.claude(tempfile.gettempdir() + "\\brak")[:1], [{"value": "sonnet", "label": "Sonnet (najnowszy)"}])
+        out = subprocess.CompletedProcess([], 0, b"Fetching available models...\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n", b"")
+        with mock.patch.object(models.subprocess, "run", return_value=out):
+            self.assertEqual(models.antigravity("agy"), [{"value": "gemini-3.8-flash-high", "label": "Gemini 3.8 Flash (High)"}])
+        with mock.patch.object(models.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, b"", b"sign in")):
+            self.assertEqual(models.antigravity("agy"), [])
 
     def test_limits_from_each_cli(self):
         usage = ("Gemini Models\tWeekly Limit Remaining\t91%\t2026-11-09T19:43:39Z\n"
