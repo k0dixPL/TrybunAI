@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrybunAI — Claude, Codex i Antigravity w jednym oknie</title>
+<meta name="description" content="Program na Windows: jeden czat dla Claude Code, Codex i Antigravity. Debaty modeli, wspólna pamięć projektu, kontrola limitów.">
+<link rel="icon" href="favicon.ico">
+<style>
+:root{--bg:#14161a;--panel:#1c1f25;--line:#2c313a;--text:#e6e8eb;--dim:#9aa3ad;--accent:#3d6fd1;
+--claude:#e08a5f;--codex:#4fbf8f;--agy:#e874b0;--haiku:#d3bd63}
+@media (prefers-color-scheme: light){:root{--bg:#f6f7f9;--panel:#fff;--line:#dde1e6;--text:#1b1e23;--dim:#5d6670}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "Segoe UI",system-ui,sans-serif}
+a{color:var(--accent)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+header{display:flex;align-items:center;gap:12px;padding:18px 0}
+header img{width:40px;height:40px}
+header b{font-size:20px}
+header nav{margin-left:auto;display:flex;gap:18px;font-size:15px}
+header nav a{color:var(--dim);text-decoration:none}header nav a:hover{color:var(--text)}
+.hero{text-align:center;padding:36px 0 26px}
+.hero h1{font-size:clamp(28px,5vw,44px);line-height:1.15;margin:0 0 14px}
+.hero h1 span{background:linear-gradient(90deg,var(--claude),var(--codex),var(--agy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--dim);font-size:18px;max-width:640px;margin:0 auto 26px}
+.dl{display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#fff;text-decoration:none;
+padding:14px 28px;border-radius:12px;font-size:18px;font-weight:600;box-shadow:0 6px 20px #3d6fd155}
+.dl:hover{filter:brightness(1.08)}
+.dl svg{width:22px;height:22px}
+.meta{color:var(--dim);font-size:14px;margin-top:12px;min-height:1.6em}
+.shot{margin:26px auto 0;max-width:960px;border-radius:12px;border:1px solid var(--line);overflow:hidden;
+box-shadow:0 20px 50px #0007}
+.shot img{display:block;width:100%;height:auto}
+section{padding:34px 0}
+h2{font-size:26px;margin:0 0 18px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;border-top:3px solid var(--c,var(--line))}
+.card h3{margin:0 0 6px;font-size:17px}
+.card p{margin:0;color:var(--dim);font-size:15px}
+ol.steps{max-width:720px;margin:0 auto;padding-left:22px}
+ol.steps li{margin:10px 0}
+code{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:14px}
+.note{max-width:720px;margin:18px auto 0;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--haiku);
+border-radius:10px;padding:12px 16px;color:var(--dim);font-size:15px}
+footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;border-top:1px solid var(--line);margin-top:20px}
+@media (max-width:600px){header nav{display:none}.hero p{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="logo.png" alt="">
+    <b>TrybunAI</b>
+    <nav><a href="#funkcje">Funkcje</a><a href="#start">Jak zacząć</a><a href="https://github.com/k0dixPL/TrybunAI">GitHub</a></nav>
+  </header>
+
+  <div class="hero">
+    <h1>Claude, Codex i Antigravity<br><span>w jednym oknie czatu</span></h1>
+    <p>Program na Windows, który rozmawia z kilkoma modelami AI naraz w folderze Twojego projektu. Modele widzą nawzajem swoje odpowiedzi, mogą debatować, a jeden wdraża ustalenia.</p>
+    <a class="dl" id="download" href="https://github.com/k0dixPL/TrybunAI/releases/latest/download/TrybunAI.exe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+      Pobierz TrybunAI.exe
+    </a>
+    <div class="meta" id="meta">Windows 10/11 · jeden plik, bez instalacji</div>
+  </div>
+
+  <div class="shot"><img src="screenshot.png" alt="Okno TrybunAI: debata Claude, Codex i Antigravity, a potem wdrożenie przez Claude" width="1084" height="721"></div>
+
+  <section id="funkcje">
+    <h2>Co potrafi</h2>
+    <div class="grid">
+      <div class="card" style="--c:var(--claude)"><h3>Wspólny czat</h3><p>Piszesz <code>@claude</code>, <code>@codex</code>, <code>@agy</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p></div>
+      <div class="card" style="--c:var(--codex)"><h3>Debaty modeli</h3><p>Wybierasz uczestników, liczbę rund, kto zaczyna i kto kończy. Po debacie wybrany model wdraża ustalenia, a reszta je sprawdza.</p></div>
+      <div class="card" style="--c:var(--agy)"><h3>Pamięć projektu</h3><p>Zwięzłe ustalenia projektu zamiast ciągnięcia ogromnej historii. Długie sesje odświeżają się same, co mocno oszczędza limity.</p></div>
+      <div class="card" style="--c:var(--haiku)"><h3>Limity pod kontrolą</h3><p>Plan i zużycie limitów Claude, Codex i Antigravity w jednym miejscu. Przy każdej odpowiedzi widać rozmiar kontekstu.</p></div>
+      <div class="card"><h3>Uprawnienia na model</h3><p>Tylko odczyt, edycja plików albo pełny dostęp, osobno dla każdego modelu. Debaty zawsze tylko do odczytu.</p></div>
+      <div class="card"><h3>Prompter</h3><p>Haiku przepisuje chaotyczną notatkę na porządny prompt, zanim go wyślesz.</p></div>
+    </div>
+  </section>
+
+  <section id="start">
+    <h2>Jak zacząć</h2>
+    <ol class="steps">
+      <li><b>Pobierz</b> <code>TrybunAI.exe</code> i skopiuj go do folderu swojego projektu. Modele pracują w folderze, w którym leży exe.</li>
+      <li><b>Uruchom.</b> Przy pierwszym starcie przycisk <b>Instalacja</b> doinstaluje brakujące narzędzia (Claude Code, Codex, Antigravity) i po kolei otworzy okna logowania.</li>
+      <li><b>Pisz.</b> Historia rozmowy i pamięć projektu zapisują się w folderze <code>.trybunai</code> obok exe.</li>
+    </ol>
+    <div class="note">Potrzebujesz własnych kont: Claude (np. plan Pro), ChatGPT dla Codexa i konta Google dla Antigravity. Wystarczy jedno z nich. Plik nie jest podpisany cyfrowo, więc Windows może pokazać ostrzeżenie SmartScreen: kliknij <b>Więcej informacji → Uruchom mimo to</b>.</div>
+  </section>
+
+  <footer>
+    TrybunAI · kod źródłowy i historia zmian na <a href="https://github.com/k0dixPL/TrybunAI">GitHubie</a> ·
+    <a href="https://github.com/k0dixPL/TrybunAI/releases">wszystkie wersje</a>
+  </footer>
+</div>
+<script>
+// Version, date and size of the newest release; the button works without it.
+fetch("https://api.github.com/repos/k0dixPL/TrybunAI/releases/latest")
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(rel => {
+    const exe = (rel.assets || []).find(a => a.name === "TrybunAI.exe");
+    const parts = ["Wersja " + rel.tag_name.replace(/^v/, ""), new Date(rel.published_at).toLocaleDateString("pl-PL")];
+    if (exe) parts.push((exe.size / 1048576).toFixed(1) + " MB");
+    document.getElementById("meta").textContent = parts.join(" · ") + " · Windows 10/11, bez instalacji";
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

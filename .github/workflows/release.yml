@@ -1,0 +1,76 @@
+# Pushing a version tag (e.g. v1.0.9) builds TrybunAI.exe on Windows and publishes it as a GitHub Release.
+# The download page links to releases/latest/download/TrybunAI.exe, so it always serves the newest build.
+name: Wydanie exe
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Istniejący tag do zbudowania, np. v1.0.8"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Zależności
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Tag zgodny z wersją w kodzie
+        shell: pwsh
+        run: |
+          $version = python -c "import trybun; print(trybun.__version__)"
+          if ("v$version" -ne $env:TAG) { throw "Tag $env:TAG nie zgadza się z wersją w trybun/__init__.py ($version)" }
+
+      - name: Testy
+        run: python -m unittest discover -s tests
+
+      - name: Budowanie exe
+        shell: pwsh
+        run: |
+          python make_assets.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name TrybunAI `
+            --icon "assets\icon.ico" --add-data "ui\index.html;ui" --add-data "ui\logo.png;ui" app.py
+
+      - name: Opis wydania z CHANGELOG.md
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart("v")
+          $lines = Get-Content CHANGELOG.md -Encoding utf8
+          $start = [Array]::FindIndex($lines, [Predicate[string]]{ param($l) $l -like "## $version*" })
+          $notes = @()
+          if ($start -ge 0) {
+            for ($i = $start + 1; $i -lt $lines.Count -and $lines[$i] -notlike "## *"; $i++) { $notes += $lines[$i] }
+          }
+          $notes += ""
+          $notes += "**Pobierz:** ``TrybunAI.exe`` poniżej. Skopiuj go do folderu projektu i uruchom."
+          $notes += "Windows może pokazać ostrzeżenie SmartScreen (plik nie jest podpisany): kliknij **Więcej informacji → Uruchom mimo to**."
+          Set-Content notes.md ($notes -join "`n") -Encoding utf8
+
+      - name: Wydanie na GitHubie
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = $env:TAG.TrimStart("v")
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG dist\TrybunAI.exe --clobber
+          } else {
+            gh release create $env:TAG dist\TrybunAI.exe --title "TrybunAI $version" --notes-file notes.md --latest
+          }
