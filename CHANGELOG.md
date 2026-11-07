@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.0.11 — 2026-11-08
+- Sprawdzanie po debacie kończy się werdyktem: AKCEPTUJĘ, UWAGI albo NIE MOGĘ SPRAWDZIĆ (plakietka przy
+  odpowiedzi). Brak werdyktu nigdy nie liczy się jako akceptacja. Przy uwagach wdrażający poprawia
+  i sprawdzający oceniają ponownie, najwyżej 0–2 razy (ustawienie w menu Debata). Na końcu podsumowanie;
+  ostatnie słowo należy do użytkownika.
+- Role modeli w Ustawieniach (np. „inżynier”, „tester”, „pedagog”), dopisywane do każdej wiadomości modelu.
+- Kartka „chciał zrobić coś ponad uprawnienia”: lista zablokowanych działań (Claude, Haiku, Antigravity)
+  i przycisk jednorazowej zgody z ponowieniem. Stałe uprawnienia się nie zmieniają. Nie dotyczy debat
+  i sprawdzania, które są tylko do odczytu z założenia.
+
 ## 1.0.10 — 2026-11-08
 - Górny pasek: Instalacja, Zdalnie, Ustawienia, Nowa rozmowa. Wybór uprawnień przeniesiony na dół,
   zaraz za przyciskami modeli, nad polem wiadomości.

@@ -153,6 +153,16 @@ def _shorten(value, limit=140):
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+_WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit", "write_file", "replace_file_content",
+                "multi_replace_file_content", "sed_file", "notebook_edit"}
+
+
+def _denied(name, params):
+    """A blocked tool call and the lowest mode that would have allowed it."""
+    return ("denied", {"tool": str(name), "detail": _tool_summary(name, params),
+                       "needs": "edit" if name in _WRITE_TOOLS else "full"})
+
+
 def _tool_summary(name, params):
     if isinstance(params, dict):
         params = {str(k).lower(): v for k, v in params.items()}  # Antigravity uses "Path", "CommandLine"
@@ -166,7 +176,7 @@ def _tool_summary(name, params):
 def parse_event(agent_id, obj):
     """Translate one JSON line into (kind, value) tuples.
 
-    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits, usage.
+    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits, usage, denied.
     """
     if not isinstance(obj, dict):
         return []
@@ -204,9 +214,12 @@ def _parse_claude(o):
                                      "context": context}))
         return events
     elif kind == "result":
+        events = [_denied(d.get("tool_name"), d.get("tool_input")) for d in o.get("permission_denials") or []
+                  if isinstance(d, dict)]
         if o.get("is_error"):
             detail = o.get("result") or "; ".join(map(str, o.get("errors") or [])) or o.get("subtype")
-            return [("fatal", str(detail))]
+            events.append(("fatal", str(detail)))
+        return events
     return []
 
 
@@ -270,4 +283,8 @@ def _parse_antigravity(o):
     if step.get("step_type") == "tool" and step.get("state") == "ACTIVE":
         info = step.get("tool_info") or {}
         return [("break", None), ("activity", _tool_summary(step.get("tool_name"), info.get("parameters")))]
+    if step.get("step_type") == "tool" and step.get("state") == "ERROR":
+        info = step.get("tool_info") or {}
+        if "permission denied" in str((info.get("error") or {}).get("message", "")).lower():
+            return [_denied(step.get("tool_name"), info.get("parameters"))]
     return []

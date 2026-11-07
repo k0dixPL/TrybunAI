@@ -27,8 +27,11 @@ if "ZAWIS" in data:
 if "ZLE" in data:
     print("Please set an Auth method", file=sys.stderr)
     sys.exit(41)
+reply = "odp zażółć"
+if "WERDYKT: AKCEPTUJĘ" in data:  # a reviewer: remarks first, acceptance on the re-check
+    reply = "dobrze\nWERDYKT: AKCEPTUJĘ" if "ponowne sprawdzenie" in data else "błąd w pliku\nWERDYKT: UWAGI"
 print(json.dumps({"type": "init", "session_id": "abc-123"}))
-print(json.dumps({"type": "message", "role": "assistant", "content": "odp zażółć", "delta": True}), flush=True)
+print(json.dumps({"type": "message", "role": "assistant", "content": reply, "delta": True}), flush=True)
 print(json.dumps({"type": "result", "status": "success"}))
 """
 
@@ -203,6 +206,22 @@ class Pure(unittest.TestCase):
                 Session._apply(session, kind, value, result, "r")
         self.assertEqual(result.usage(), {"model": "claude-sonnet-5", "context": 438002, "calls": 1},
                          "one call split over two events counts once")
+
+    def test_verdicts_and_denials_are_read_from_output(self):
+        self.assertEqual(core.parse_verdict("ok\n**WERDYKT: AKCEPTUJĘ**"), "accept")
+        self.assertEqual(core.parse_verdict("WERDYKT: AKCEPTUJĘ\npotem jednak\nWERDYKT: UWAGI"), "remarks")
+        self.assertEqual(core.parse_verdict("Werdykt: nie mogę sprawdzić"), "unverified")
+        self.assertEqual(core.parse_verdict("wygląda dobrze"), "unverified", "no verdict is never an acceptance")
+        claude = {"type": "result", "permission_denials": [
+            {"tool_name": "Write", "tool_input": {"file_path": "a.txt"}},
+            {"tool_name": "Bash", "tool_input": {"command": "echo y > b.txt"}}]}
+        self.assertEqual([v["needs"] for k, v in parse_event("claude", claude)], ["edit", "full"])
+        agy = {"event": "step_update", "step_update": {"step_type": "tool", "state": "ERROR", "tool_name": "run_command",
+               "tool_info": {"parameters": {"CommandLine": "echo y"}, "error": {"message": "Permission denied for x"}}}}
+        self.assertEqual(parse_event("antigravity", agy), [("denied", {"tool": "run_command",
+                                                                      "detail": "run_command: echo y", "needs": "full"})])
+        agy["step_update"]["tool_info"]["error"]["message"] = "file not found"
+        self.assertEqual(parse_event("antigravity", agy), [], "ordinary tool errors are not permission problems")
 
     def test_model_lists_from_each_cli(self):
         with tempfile.TemporaryDirectory() as home:
@@ -406,7 +425,7 @@ class Runs(unittest.TestCase):
     def test_menu_debate_order_then_implement_then_review(self):
         self.session.update_settings({"modes": {"claude": "full"}})
         result, calls = self.menu_debate({"topic": "plan gry", "agents": ["codex", "gemini", "claude"], "rounds": 2,
-                                          "implementer": "claude", "review": True})
+                                          "implementer": "claude", "review": True, "fix_rounds": 0})
         self.assertTrue(result["ok"])
         self.assertEqual(calls, [("codex", "read"), ("gemini", "read"), ("claude", "read")] * 2 +
                          [("claude", "full"), ("codex", "read"), ("gemini", "read")],
@@ -414,7 +433,46 @@ class Runs(unittest.TestCase):
         labels = [m.get("label") for m in self.session.messages if m["role"] == "assistant"]
         self.assertEqual(labels[-3:], ["wdrożenie", "sprawdzenie", "sprawdzenie"])
         self.assertEqual(self.session.messages[0]["implementer"], "claude")
-        self.assertTrue(any(e["t"] == "debate_end" and "sprawdzili" in e["text"] for e in self.events))
+        self.assertEqual([m.get("verdict") for m in self.session.messages[-2:]], ["remarks", "remarks"])
+        self.assertTrue(any(e["t"] == "debate_end" and "Zostały uwagi" in e["text"] for e in self.events))
+
+    def test_remarks_get_one_fix_round_then_a_recheck(self):
+        self.session.update_settings({"modes": {"claude": "full"}})
+        result, calls = self.menu_debate({"topic": "plan", "agents": ["claude", "codex"], "rounds": 1,
+                                          "implementer": "claude", "review": True, "fix_rounds": 2})
+        self.assertTrue(result["ok"])
+        self.assertEqual(calls[2:], [("claude", "full"), ("codex", "read"), ("claude", "full"), ("codex", "read")])
+        replies = [(m["agent"], m.get("label"), m.get("verdict")) for m in self.session.messages if m["role"] == "assistant"]
+        self.assertEqual(replies[2:], [("claude", "wdrożenie", None), ("codex", "sprawdzenie", "remarks"),
+                                       ("claude", "poprawki 1/2", None), ("codex", "sprawdzenie 2", "accept")],
+                         "an acceptance ends the loop before the cap")
+        self.assertTrue(any(e["t"] == "debate_end" and "Zaakceptowane" in e["text"] for e in self.events))
+
+    def test_blocked_actions_offer_a_one_time_retry(self):
+        def parse(agent, obj):
+            events = parse_event("gemini", obj)
+            if obj.get("type") == "result":
+                events.append(("denied", {"tool": "Write", "detail": "Write: a.html", "needs": "edit"}))
+            return events
+        seen = []
+        def fake(agent, exe, mode, *a, **k):
+            seen.append(mode)
+            return [sys.executable, str(self.dir / "fake.py")]
+        self.session.update_settings({"roles": {"gemini": "tester gry"}})
+        with mock.patch.object(core, "parse_event", parse), mock.patch.object(core, "build_command", fake):
+            self.session.send("@gemini zapisz plik", "claude")
+            self.wait_idle()
+            self.assertIn("Twoja stała rola w tym zespole (ustawił ją użytkownik): tester gry",
+                          (self.dir / "last_prompt.txt").read_text(encoding="utf-8"))
+            msg = self.session.messages[-1]
+            self.assertEqual((msg["needs"], msg["denied"][0]["tool"]), ("edit", "Write"))
+            self.assertTrue(self.session.retry_with("gemini", "edit")["ok"])
+            self.wait_idle()
+        self.assertEqual(seen, ["read", "edit"], "the retry runs once with the granted mode")
+        self.assertEqual(self.session.settings["modes"].get("gemini", "read"), "read", "lasting rights unchanged")
+        self.assertEqual(self.session.messages[-2]["grant"], "edit")
+        self.assertFalse(self.session.retry_with("gemini", "root")["ok"])
+        self.assertFalse(self.session.update_settings({"roles": {"gemini": "x" * 401}})["ok"])
 
     def test_menu_debate_refuses_read_only_implementer_and_warns_without_one(self):
         result, calls = self.menu_debate({"topic": "x", "agents": ["claude", "codex"], "implementer": "codex"})

@@ -95,10 +95,50 @@ def build_implement_turn(agents):
             "Trzymaj się ustaleń, nie dokładaj nowych pomysłów. Na końcu krótko wypisz, co zmieniłeś.")
 
 
-def build_review_turn(implementer):
-    return (f"{AGENTS[implementer]['label']} wdrożył ustalenia z debaty. Sprawdź zmienione pliki: "
+VERDICTS = {"accept": "AKCEPTUJĘ", "remarks": "UWAGI", "unverified": "NIE MOGĘ SPRAWDZIĆ"}
+_VERDICT = re.compile(r"WERDYKT\s*:?\s*\**\s*(AKCEPTUJ|UWAGI|NIE\s+MOG)", re.I)
+
+
+def build_review_turn(implementer, attempt=1):
+    again = " To ponowne sprawdzenie po poprawkach: oceń, czy uwagi zostały usunięte." if attempt > 1 else ""
+    return (f"{AGENTS[implementer]['label']} wdrożył ustalenia z debaty.{again} Sprawdź zmienione pliki: "
             "czy zrobił to, co uzgodniliśmy, i czy coś się nie zepsuło. Wypisz konkretne błędy i poprawki, "
-            "krótko. Niczego nie zmieniaj.")
+            "krótko. Niczego nie zmieniaj. Drobiazgi i kwestie gustu pomiń: uwagi tylko o realnych błędach "
+            "i odstępstwach od ustaleń.\n"
+            "Zakończ osobną ostatnią linią, dokładnie jedną z trzech:\n"
+            "WERDYKT: AKCEPTUJĘ\nWERDYKT: UWAGI\nWERDYKT: NIE MOGĘ SPRAWDZIĆ\n"
+            "Użyj NIE MOGĘ SPRAWDZIĆ, gdy nie masz jak potwierdzić działania (np. trzeba coś uruchomić), "
+            "zamiast zgadywać.")
+
+
+def build_fix_turn(reviewers):
+    names = ", ".join(AGENTS[a]["label"] for a in reviewers)
+    return (f"{names} zgłosił(a) uwagi do wdrożenia (są powyżej w czacie). Popraw to, co jest słuszne i zgodne "
+            "z ustaleniami debaty; uwagi niesłuszne pomiń z jednozdaniowym uzasadnieniem. Nie dokładaj nowych "
+            "funkcji. Na końcu krótko wypisz, co poprawiłeś.")
+
+
+MAX_FIX_ROUNDS = 2
+
+
+def _verdict_summary(verdicts):
+    parts = ", ".join(f"{AGENTS[a]['label']}: {VERDICTS[v].lower()}" for a, v in verdicts.items())
+    if all(v == "accept" for v in verdicts.values()):
+        tail = "Zaakceptowane przez modele; ostatnie słowo należy do Ciebie."
+    elif any(v == "remarks" for v in verdicts.values()):
+        tail = "Zostały uwagi: zdecyduj, co dalej."
+    else:
+        tail = "Wynik niezweryfikowany: sprawdź sam."
+    return f"Sprawdzenie: {parts}. {tail}"
+
+
+def parse_verdict(text):
+    """The reviewer's last WERDYKT line; a missing one counts as unverified, never as accepted."""
+    found = _VERDICT.findall(text or "")
+    if not found:
+        return "unverified"
+    word = found[-1].upper()
+    return "accept" if word.startswith("AKCEPT") else "remarks" if word.startswith("UWAG") else "unverified"
 
 
 def build_debate_turn(topic, agents, turn_round, rounds):
@@ -123,13 +163,15 @@ def _speaker(msg):
     return AGENTS[msg["agent"]]["label"]
 
 
-def build_turn_prompt(messages, agent_id, text, include_own=False, memory=""):
+def build_turn_prompt(messages, agent_id, text, include_own=False, memory="", role=""):
     """Prepend whatever this agent has not seen, so all models share one conversation.
 
     A model normally remembers its own replies; a fresh session (include_own) does not,
     and starts from the project memory instead of the whole history.
     """
     prompt = _chat_context(messages, agent_id, text, include_own)
+    if role.strip():
+        prompt = f"Twoja stała rola w tym zespole (ustawił ją użytkownik): {role.strip()}\n\n{prompt}"
     if memory.strip():
         prompt = ("Pamięć projektu (ustalenia z wcześniejszej pracy, prowadzona przez TrybunAI). "
                   "Punkty z sekcji „Nie ruszać” to twarde zasady: nie zmieniaj ich bez wyraźnej prośby użytkownika.\n"
@@ -247,6 +289,7 @@ class _Result:
         self.stopped = False
         self.returncode = None
         self.tail = collections.deque(maxlen=20)
+        self.denied = []  # tool calls the permission mode blocked
         self.calls = set()  # one model call arrives split over several events
         self.model = None
         self.context = 0
@@ -338,6 +381,10 @@ class Session:
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
             if not isinstance(new.get("auto_fresh", True), bool):
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
+            roles = new.get("roles", {})
+            if not isinstance(roles, dict) or any(a not in AGENTS or not isinstance(r, str) or len(r) > 400
+                                                  for a, r in roles.items()):
+                return {"ok": False, "error": "Nieprawidłowa rola (maks. 400 znaków)."}
             for model in new.get("models", {}).values():
                 if model and not is_safe_arg(model):
                     return {"ok": False, "error": f"Nieprawidłowa nazwa modelu: {model}"}
@@ -431,6 +478,8 @@ class Session:
             rounds = int(plan.get("rounds") or DEFAULT_ROUNDS)
             implementer = plan.get("implementer") or None
             review = bool(plan.get("review")) and bool(implementer)
+            # Reviewers rarely agree on details, so fix rounds are capped to stop an endless loop.
+            fix_rounds = max(0, min(MAX_FIX_ROUNDS, int(plan.get("fix_rounds", 1)))) if review else 0
             attachments = list(plan.get("attachments") or [])
         except (TypeError, ValueError):
             return {"ok": False, "error": "Nieprawidłowe ustawienia debaty."}
@@ -469,7 +518,8 @@ class Session:
             self._busy.add("debate")
             self.save()
         self.emit({"t": "message", "message": msg})
-        threading.Thread(target=self._run_debate, args=(agents, rounds, topic, attachments, implementer, review),
+        threading.Thread(target=self._run_debate,
+                         args=(agents, rounds, topic, attachments, implementer, review, fix_rounds),
                          daemon=True).start()
         warn = None
         if not implementer and _IMPLEMENT_WORDS.search(topic):
@@ -477,7 +527,7 @@ class Session:
                     "Wybierz „Kto wdraża” w menu Debata albo napisz potem np. @claude wdrażaj.")
         return {"ok": True, "warn": warn}
 
-    def _run_debate(self, agents, rounds, topic, attachments, implementer=None, review=False):
+    def _run_debate(self, agents, rounds, topic, attachments, implementer=None, review=False, fix_rounds=0):
         everybody = agents + ([implementer] if implementer and implementer not in agents else [])
         outcome = f"Debata zakończona ({rounds} z {rounds} rund)."
         try:
@@ -506,13 +556,28 @@ class Session:
                 outcome += " Wdrożenie " + ("zatrzymano." if status == "stopped" else "przerwał błąd modelu.")
                 return
             outcome += f" {AGENTS[implementer]['label']} wdrożył ustalenia."
-            if review:
-                for agent in [a for a in agents if a != implementer]:
-                    status = self._after_debate_turn(agent, build_review_turn(implementer), "read", "sprawdzenie")
+            reviewers = [a for a in agents if a != implementer]
+            if not review or not reviewers:
+                return
+            for attempt in range(1, fix_rounds + 2):
+                verdicts = {}
+                for agent in reviewers:
+                    label = "sprawdzenie" if attempt == 1 else f"sprawdzenie {attempt}"
+                    status = self._after_debate_turn(agent, build_review_turn(implementer, attempt), "read", label,
+                                                     verdict=True)
                     if status != "ok":
                         outcome += " Sprawdzanie przerwano."
                         return
-                outcome += " Pozostali sprawdzili wdrożenie."
+                    verdicts[agent] = self._last_verdict(agent)
+                complaining = [a for a, v in verdicts.items() if v == "remarks"]
+                if not complaining or attempt > fix_rounds:
+                    break
+                status = self._after_debate_turn(implementer, build_fix_turn(complaining), None,
+                                                 f"poprawki {attempt}/{fix_rounds}")
+                if status != "ok":
+                    outcome += " Poprawki przerwano."
+                    return
+            outcome += " " + _verdict_summary(verdicts)
         except Exception as exc:  # participants must never stay busy forever
             outcome = f"Debata przerwana: {type(exc).__name__}: {exc}"
         finally:
@@ -526,12 +591,40 @@ class Session:
                 self._stop_requested.difference_update(everybody)
             self.emit({"t": "debate_end", "text": outcome})
 
-    def _after_debate_turn(self, agent, body, mode, label):
+    def _after_debate_turn(self, agent, body, mode, label, verdict=False):
         with self._lock:
             if agent in self._stop_requested:
                 return "stopped"
             count = len(self.messages) + 1
-        return self._run_turn(agent, body, count, mode=mode, keep_busy=True, turn_label=label)
+        return self._run_turn(agent, body, count, mode=mode, keep_busy=True, turn_label=label, verdict=verdict)
+
+    def _last_verdict(self, agent):
+        with self._lock:
+            last = next((m for m in reversed(self.messages) if m.get("agent") == agent), {})
+        return last.get("verdict", "unverified")
+
+    def retry_with(self, agent, mode):
+        """One turn with higher rights, after the user saw what the model was not allowed to do."""
+        if agent not in AGENTS or mode not in ("edit", "full"):
+            return {"ok": False, "error": "Nieprawidłowe uprawnienia."}
+        word = "edycję plików" if mode == "edit" else "pełny dostęp"
+        body = (f"Pozwalam jednorazowo na {word}. Dokończ to, co poprzednio zablokowały uprawnienia, "
+                "i nic ponad to.")
+        with self._lock:
+            if "debate" in self._busy:
+                return {"ok": False, "error": "Trwa debata. Poczekaj albo ją zatrzymaj."}
+            if not self._binaries.get(agent):
+                return {"ok": False, "error": f"Nie znaleziono CLI: {AGENTS[agent]['label']}."}
+            if agent in self._busy:
+                return {"ok": False, "error": f"Jeszcze pracuje: {AGENTS[agent]['label']}."}
+            msg = self._new_message("user", text=body, targets=[agent], grant=mode)
+            self.messages.append(msg)
+            count = len(self.messages)
+            self._busy.add(agent)
+            self.save()
+        self.emit({"t": "message", "message": msg})
+        threading.Thread(target=self._run_turn, args=(agent, body, count), kwargs={"mode": mode}, daemon=True).start()
+        return {"ok": True}
 
     def fresh_session(self, agent):
         """Replace a model's long session with the project memory and the latest exchange."""
@@ -544,7 +637,8 @@ class Session:
         threading.Thread(target=self._refresh_sessions, args=([agent], False), daemon=True).start()
         return {"ok": True}
 
-    def _run_turn(self, agent, body, count, attachments=(), mode=None, keep_busy=False, turn_label=None):
+    def _run_turn(self, agent, body, count, attachments=(), mode=None, keep_busy=False, turn_label=None,
+                  verdict=False):
         """Runs one model once and returns the reply's status."""
         run_id = uuid.uuid4().hex
         self.emit({"t": "start", "id": run_id, "agent": agent, "label": turn_label})
@@ -558,12 +652,13 @@ class Session:
                 unseen = self.messages[state.get("seen", 0): count - 1]
                 model = self.settings["models"].get(agent) or None
                 mode = mode or self.settings["modes"].get(agent, "read")
+                role = (self.settings.get("roles") or {}).get(agent, "")
             if attachments:
                 body += "\n\nZałączone pliki (ścieżki względem folderu projektu):\n" + \
                     "\n".join(f"- {a}" for a in attachments)
             fresh = not state.get("id")
             prompt = build_turn_prompt(unseen, agent, body, include_own=fresh,
-                                       memory=self.read_memory() if fresh else "")
+                                       memory=self.read_memory() if fresh else "", role=role)
             images = [self._attachment_path(a) for a in attachments
                       if a.lower().endswith(IMAGE_SUFFIXES)] if agent == "codex" else []
             name = session_name(self.project.name, "" if agent == "claude" else agent)
@@ -589,6 +684,14 @@ class Session:
             usage = result.usage()
             if usage:
                 msg["usage"] = usage
+            if verdict and status == "ok":
+                msg["verdict"] = parse_verdict(result.text)
+            # Debaters and reviewers are read-only on purpose, so their blocked attempts need no decision.
+            read_only_by_design = bool(turn_label) and turn_label.startswith(("runda", "sprawdzenie"))
+            if result.denied and not read_only_by_design and mode != "full":
+                msg["denied"] = result.denied
+                needs_full = mode == "edit" or any(d.get("needs") == "full" for d in result.denied)
+                msg["needs"] = "full" if needs_full else "edit"
             if images:
                 msg["images"] = images
             if turn_label:
@@ -927,6 +1030,9 @@ class Session:
             self._text(result, value, run_id)
         elif kind == "limits":
             limits.record_claude(value)
+        elif kind == "denied" and isinstance(value, dict):
+            if value not in result.denied and len(result.denied) < 8:
+                result.denied.append(value)
         elif kind == "usage" and isinstance(value, dict):
             result.calls.add(value.get("call"))
             result.model = value.get("model") or result.model

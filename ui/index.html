@@ -48,6 +48,12 @@ header img{height:30px;width:30px}
 .note{color:var(--dim);font-size:12.5px;font-style:italic}
 .acts{font:12px Consolas,monospace;color:var(--dim);margin-top:5px}
 .usage{margin-left:auto;font-size:11.5px}.usage.big{color:var(--haiku)}
+.verdict{font-size:11px;font-weight:600;padding:0 7px;border-radius:9px;border:1px solid}
+.verdict.accept{color:var(--codex)}.verdict.remarks{color:var(--haiku)}.verdict.unverified{color:var(--dim)}
+.needcard{margin-top:8px;padding:8px 11px;border:1px solid var(--prompter);border-radius:8px;font-size:13px}
+.needcard ul{margin:4px 0 7px;padding-left:20px;font:12px Consolas,monospace;color:var(--dim)}
+.needcard button{border-color:var(--prompter);color:var(--prompter);font-size:12.5px}
+.needcard small{color:var(--dim);margin-left:8px;font-size:12px}
 .ctxwarn{margin-top:7px;padding:6px 9px;border:1px solid var(--haiku);border-radius:7px;font-size:12.5px;color:var(--haiku);display:flex;gap:10px;align-items:center}
 .ctxwarn button{font-size:12px;padding:1px 9px;white-space:nowrap}
 #debatebtn{border-color:var(--haiku);color:var(--haiku);height:42px}
@@ -106,6 +112,8 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 .modelpick:has(input:not([hidden])) select{width:104px}
 #dlg{overflow-x:hidden}
 #modelsrefresh{font-size:12.5px;margin:2px 0}
+dialog label.rolerow{margin:-4px 0 12px;color:var(--dim);font-size:13px}
+dialog input.rolepick{width:340px}
 #memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:12.5px;margin-top:4px}
 #limits .acct{margin:8px 0 10px}
 #limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
@@ -177,8 +185,9 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
   <div id="deborder"></div>
   <label>Kto wdraża po debacie <select id="debimpl"></select></label>
   <label style="justify-content:flex-start"><input id="debreview" type="checkbox"> Pozostali sprawdzą wdrożenie</label>
+  <label>Rundy poprawek po uwagach <select id="debfix"><option value="0">0 (tylko werdykt)</option><option value="1" selected>1</option><option value="2">2</option></select></label>
   <div id="deberr" class="err" role="alert"></div>
-  <small id="debnote">Debata działa tylko do odczytu. Wdraża wybrany model po ostatniej rundzie, ze swoimi uprawnieniami. Każda tura zużywa limit danego modelu.</small>
+  <small id="debnote">Debata działa tylko do odczytu. Wdraża wybrany model po ostatniej rundzie, ze swoimi uprawnieniami. Sprawdzający kończą werdyktem: akceptuję, uwagi albo nie mogę sprawdzić. Przy uwagach wdrażający poprawia, najwyżej tyle razy, ile rund poprawek. Każda tura zużywa limit danego modelu.</small>
   <menu style="gap:8px"><button id="debcancel" type="button">Anuluj</button><button id="debgo" type="button">Rozpocznij</button></menu>
 </dialog>
 <dialog id="dlg"><form method="dialog">
@@ -288,7 +297,7 @@ function userBubble(msg) {
   span.textContent = msg.debate
     ? `Ty → debata, ${msg.debate} rund(y): ${order} (tylko odczyt)` +
       (msg.implementer ? ` · wdraża ${S.agents[msg.implementer].label}` : "")
-    : "Ty → " + names;
+    : "Ty → " + names + (msg.grant ? ` (jednorazowo: ${MODE_TEXT[msg.grant]})` : "");
   const parts = bubble("user", span);
   parts.b.innerHTML = markdown(msg.text);
   addFiles(parts.b, msg.attachments);
@@ -328,7 +337,35 @@ function finish(parts, msg) {
   if (msg.status === "stopped") addLine(parts.b, "note", "Przerwano.");
   if (msg.error) addLine(parts.b, "err", msg.error);
   addFiles(parts.b, msg.images);
+  addVerdict(parts, msg);
   addUsage(parts, msg);
+  addNeeds(parts, msg);
+}
+const VERDICT_TEXT = {accept: "AKCEPTUJĘ", remarks: "UWAGI", unverified: "NIE MÓGŁ SPRAWDZIĆ"};
+function addVerdict(parts, msg) {
+  if (!msg.verdict) return;
+  const s = document.createElement("span"); s.className = "verdict " + msg.verdict;
+  s.textContent = VERDICT_TEXT[msg.verdict] || msg.verdict; parts.w.append(s);
+}
+const MODE_TEXT = {edit: "edycję plików", full: "pełny dostęp"};
+function addNeeds(parts, msg) {
+  // Only the model's latest reply can still be acted on.
+  document.querySelectorAll(`.needcard[data-agent="${msg.agent}"]`).forEach(c => c.remove());
+  if (!msg.denied || !msg.needs) return;
+  const c = document.createElement("div"); c.className = "needcard"; c.dataset.agent = msg.agent;
+  const t = document.createElement("div");
+  t.textContent = `${S.agents[msg.agent].label} chciał zrobić coś ponad swoje uprawnienia i dostał odmowę:`;
+  const list = document.createElement("ul");
+  for (const d of msg.denied) { const li = document.createElement("li"); li.textContent = d.detail || d.tool; list.append(li); }
+  const b = document.createElement("button"); b.type = "button";
+  b.textContent = `Pozwól jednorazowo na ${MODE_TEXT[msg.needs]} i powtórz`;
+  b.onclick = async () => {
+    const r = await api.retry_with(msg.agent, msg.needs);
+    if (!r.ok) return toast(r.error);
+    c.remove();
+  };
+  const n = document.createElement("small"); n.textContent = "Twoje stałe uprawnienia się nie zmienią.";
+  c.append(t, list, b, n); parts.b.append(c);
 }
 const kTokens = n => n >= 1000 ? Math.round(n / 1000) + " tys." : String(n);
 const steps = n => (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) ? " kroki" : " kroków";
@@ -492,6 +529,7 @@ function debRefresh(changed) {
   const impl = $("debimpl").value;
   $("debreview").disabled = !impl;
   if (!impl) $("debreview").checked = false;
+  $("debfix").disabled = !$("debreview").checked;
   $("deberr").textContent = impl && (S.settings.modes[impl] || "read") === "read"
     ? `${S.agents[impl].label} ma uprawnienia „Tylko odczyt”: zmień je na górze okna, żeby mógł wdrażać.` : "";
 }
@@ -513,16 +551,19 @@ function openDebate() {
   if (defaults.includes(saved.first)) { $("debfirst").value = saved.first; debRefresh("first"); }
   if (defaults.includes(saved.last)) { $("deblast").value = saved.last; debRefresh("last"); }
   $("debreview").checked = !!saved.review && !!impl.value;
+  $("debfix").value = String(saved.fix_rounds ?? 1);
+  debRefresh();
   $("debdlg").showModal(); $("debtopic").focus();
 }
 async function startDebate() {
   const plan = {topic: $("debtopic").value.trim(), agents: debOrder(), rounds: +$("debrounds").value,
                 implementer: $("debimpl").value || null, review: $("debreview").checked,
-                attachments: files.map(f => f.path)};
+                fix_rounds: +$("debfix").value, attachments: files.map(f => f.path)};
   const r = await api.debate(plan);
   if (!r.ok) { $("deberr").textContent = r.error; return; }
   try { localStorage.setItem("debate", JSON.stringify({agents: plan.agents, rounds: plan.rounds, first: plan.agents[0],
-        last: plan.agents[plan.agents.length - 1], implementer: plan.implementer, review: plan.review})); } catch (e) {}
+        last: plan.agents[plan.agents.length - 1], implementer: plan.implementer, review: plan.review,
+        fix_rounds: plan.fix_rounds})); } catch (e) {}
   $("debdlg").close();
   files = []; drawFiles(); $("input").value = ""; grow();
   if (r.warn) toast(r.warn);
@@ -636,7 +677,17 @@ function drawModelPickers() {
     custom.hidden = sel.value !== CUSTOM;
     sel.onchange = () => { custom.hidden = sel.value !== CUSTOM; if (!custom.hidden) custom.focus(); };
     wrap.append(sel, custom); l.append(wrap); box.append(l);
+    const rl = document.createElement("label"); rl.className = "rolerow"; rl.textContent = "Rola";
+    const role = document.createElement("input"); role.type = "text"; role.className = "rolepick"; role.dataset.agent = id;
+    role.maxLength = 400; role.value = (S.settings.roles || {})[id] || "";
+    role.placeholder = {claude: "np. inżynier: koduje i wdraża", codex: "np. tester i architekt", antigravity: "np. pedagog: ocenia z perspektywy dziecka"}[id] || "np. recenzent";
+    rl.append(role); box.append(rl);
   }
+}
+function chosenRoles() {
+  const roles = {};
+  document.querySelectorAll("#models .rolepick").forEach(i => { if (i.value.trim()) roles[i.dataset.agent] = i.value.trim(); });
+  return roles;
 }
 function chosenModels() {
   const models = {};
@@ -649,9 +700,10 @@ function chosenModels() {
 async function loadModelLists(refresh) {
   const b = $("modelsrefresh"); b.disabled = true; b.textContent = refresh ? "Odświeżam…" : "Wczytuję listy…";
   try {
-    const keep = chosenModels();  // a choice made before the lists arrive must survive the redraw
+    const keep = chosenModels(), keepRoles = chosenRoles();  // edits made before the lists arrive survive the redraw
     modelLists = await api.model_options(!!refresh);
     S.settings.models = {...S.settings.models, ...keep};
+    S.settings.roles = keepRoles;
     drawModelPickers();
   } finally { b.disabled = false; b.textContent = "Odśwież listy modeli"; }
 }
@@ -742,10 +794,12 @@ window.addEventListener("pywebviewready", async () => {
   $("debfirst").onchange = () => debRefresh("first");
   $("deblast").onchange = () => debRefresh("last");
   $("debimpl").onchange = () => debRefresh();
+  $("debreview").onchange = () => debRefresh();
   $("dlg").addEventListener("close", async () => {
     const models = chosenModels();
     const everyone = [...document.querySelectorAll("#everyone input:checked")].map(c => c.dataset.agent);
-    const changes = {prompter: $("engine").value, models, everyone, auto_fresh: $("autofresh").checked};
+    const changes = {prompter: $("engine").value, models, everyone, auto_fresh: $("autofresh").checked,
+                     roles: chosenRoles()};
     const r = await api.update_settings(changes);
     if (r.ok) Object.assign(S.settings, changes); else toast(r.error);
     if ($("memory").dataset.loaded === "1" && $("memory").value !== $("memory").dataset.original)

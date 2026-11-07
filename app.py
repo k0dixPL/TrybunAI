@@ -97,6 +97,9 @@ class Api:
     def save_state(self):
         return self._session.save_state()
 
+    def retry_with(self, agent, mode):
+        return self._session.retry_with(agent, mode)
+
     def model_options(self, refresh=False):
         return self._session.model_options(refresh)
 
