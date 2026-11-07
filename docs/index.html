@@ -94,13 +94,19 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
   </footer>
 </div>
 <script>
-// Version, date and size of the newest release; the button works without it.
-fetch("https://api.github.com/repos/k0dixPL/TrybunAI/releases/latest")
+// Version, date, size and total downloads from the releases; the button works without it.
+const exeOf = rel => (rel.assets || []).find(a => a.name === "TrybunAI.exe");
+const downloads = n => `pobrano ${n.toLocaleString("pl-PL")} ${n === 1 ? "raz" : "razy"}`;
+fetch("https://api.github.com/repos/k0dixPL/TrybunAI/releases?per_page=100")
   .then(r => r.ok ? r.json() : Promise.reject())
-  .then(rel => {
-    const exe = (rel.assets || []).find(a => a.name === "TrybunAI.exe");
-    const parts = ["Wersja " + rel.tag_name.replace(/^v/, ""), new Date(rel.published_at).toLocaleDateString("pl-PL")];
-    if (exe) parts.push((exe.size / 1048576).toFixed(1) + " MB");
+  .then(all => {
+    const releases = all.filter(r => !r.draft && !r.prerelease);
+    const rel = releases.find(r => exeOf(r));
+    if (!rel) return;
+    const exe = exeOf(rel);
+    const total = releases.reduce((sum, r) => sum + (exeOf(r)?.download_count || 0), 0);
+    const parts = ["Wersja " + rel.tag_name.replace(/^v/, ""), new Date(rel.published_at).toLocaleDateString("pl-PL"),
+                   (exe.size / 1048576).toFixed(1) + " MB", downloads(total)];
     document.getElementById("meta").textContent = parts.join(" · ") + " · Windows 10/11, bez instalacji";
   })
   .catch(() => {});
