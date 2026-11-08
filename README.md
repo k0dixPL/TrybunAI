@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/logo.png" width="96" alt=""></p>
+<p align="center"><img src="docs/logo.png" width="160" alt="Logo TrybunAI"></p>
 
 <h1 align="center">TrybunAI</h1>
 
@@ -11,6 +11,15 @@
   &nbsp;·&nbsp;
   <a href="https://github.com/k0dixPL/TrybunAI/releases">Wszystkie wersje</a>
 </p>
+
+<p align="center">
+  <a href="https://github.com/k0dixPL/TrybunAI/stargazers"><img src="https://img.shields.io/github/stars/k0dixPL/TrybunAI?style=flat&logo=github&label=%E2%AD%90%20gwiazdki" alt="Gwiazdki"></a>
+  <a href="https://github.com/k0dixPL/TrybunAI/releases/latest"><img src="https://img.shields.io/github/v/release/k0dixPL/TrybunAI?label=wersja" alt="Wersja"></a>
+  <a href="https://github.com/k0dixPL/TrybunAI/releases"><img src="https://img.shields.io/github/downloads/k0dixPL/TrybunAI/total?label=pobrania" alt="Pobrania"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licencja-MIT-blue" alt="Licencja MIT"></a>
+</p>
+
+> ⭐ **Podoba Ci się TrybunAI?** Kliknij **Star** w prawym górnym rogu tej strony — to nic nie kosztuje, a pomaga innym znaleźć projekt.
 
 ![Okno TrybunAI](docs/screenshot.png)
 
@@ -36,6 +45,12 @@ TrybunAI to jeden plik `.exe`, który steruje narzędziami AI do programowania (
 Potrzebne są własne konta: Claude (np. plan Pro), ChatGPT dla Codexa i/lub konto Google dla Antigravity.
 
 > Plik nie jest podpisany cyfrowo, więc Windows może pokazać ostrzeżenie SmartScreen: **Więcej informacji → Uruchom mimo to**.
+
+## Uwagi, pytania, pomysły
+
+- 💬 [Dyskusje](https://github.com/k0dixPL/TrybunAI/discussions) — pytania, pomysły i wrażenia z używania.
+- 🐞 [Zgłoś błąd](https://github.com/k0dixPL/TrybunAI/issues/new) — co się stało, co zrobiłeś wcześniej i wersja z okna „?”.
+- ⭐ Jeśli program Ci się przydaje, [zostaw gwiazdkę](https://github.com/k0dixPL/TrybunAI) — to najprostszy sposób, żeby wesprzeć projekt.
 
 ## Dla programistów
 
