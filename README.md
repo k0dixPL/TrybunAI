@@ -44,4 +44,6 @@ Potrzebne są własne konta: Claude (np. plan Pro), ChatGPT dla Codexa i/lub kon
 .venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
+Licencja: [MIT](LICENSE) — możesz używać, zmieniać i rozpowszechniać, także komercyjnie, zachowując informację o autorstwie.
+
 Wydanie: podbij wersję w `trybun/__init__.py`, dopisz wpis w `CHANGELOG.md`, a potem wypchnij tag, np. `git tag v1.0.9; git push origin v1.0.9`. GitHub Actions zbuduje exe i opublikuje je w *Releases*. Zasady numeracji: [`CLAUDE.md`](CLAUDE.md), historia zmian: [`CHANGELOG.md`](CHANGELOG.md).
