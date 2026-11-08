@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from trybun import core, limits, mapa, models, setup, update  # noqa: E402
+from trybun import core, limits, mapa, models, setup, stats, update  # noqa: E402
 from trybun.agents import (build_command, build_remote_command, parse_event, session_name,  # noqa: E402
                            stdin_payload)
 from trybun.remote import RemoteControl  # noqa: E402
@@ -198,14 +198,60 @@ class Pure(unittest.TestCase):
             "usage": {"input_tokens": 2, "cache_creation_input_tokens": 1000, "cache_read_input_tokens": 437000}}}
         self.assertEqual(parse_event("claude", event),
                          [("activity", "Read: a.html"), ("usage", {"call": "m1", "model": "claude-sonnet-5",
-                                                                   "context": 438002})])
+                                                                   "context": 438002}),
+                          ("tokens", {"call": "m1", "input": 1002, "cached": 437000, "output": 0})])
         result = core._Result()
         session = Session.__new__(Session)
+        event["message"]["usage"]["output_tokens"] = 50  # the final event of the call has the output count
         for kind, value in parse_event("claude", event) + parse_event("claude", event):
-            if kind == "usage":
+            if kind in ("usage", "tokens"):
                 Session._apply(session, kind, value, result, "r")
         self.assertEqual(result.usage(), {"model": "claude-sonnet-5", "context": 438002, "calls": 1},
                          "one call split over two events counts once")
+        self.assertEqual(result.token_total(), {"input": 1002, "cached": 437000, "output": 50})
+
+    def test_token_counts_from_codex_antigravity_and_gemini(self):
+        codex = {"type": "turn.completed", "usage": {"input_tokens": 9000, "cached_input_tokens": 7000,
+                                                     "output_tokens": 300}}
+        self.assertEqual(parse_event("codex", codex),
+                         [("tokens", {"call": "turn", "input": 2000, "cached": 7000, "output": 300})])
+        agy = {"event": "step_update", "step_update": {"step_type": "agent_response", "state": "DONE",
+               "conversation_id": "c", "step_index": 3, "usage": {"input_tokens": 500, "output_tokens": 40}}}
+        self.assertIn(("tokens", {"call": "c:3", "input": 500, "cached": 0, "output": 40}),
+                      parse_event("antigravity", agy))
+        gem = {"type": "result", "status": "success", "stats": {"input_tokens": 100, "cached": 30, "output_tokens": 5}}
+        self.assertEqual(parse_event("gemini", gem), [("tokens", {"call": "result", "input": 70, "cached": 30,
+                                                                  "output": 5})])
+        bad = {"type": "turn.completed", "usage": {"input_tokens": "x"}}
+        self.assertEqual(parse_event("codex", bad)[0][1]["input"], 0, "junk never breaks a turn")
+
+    def test_token_stats_buckets_by_local_time(self):
+        from datetime import datetime
+        with tempfile.TemporaryDirectory() as tmp:
+            now = datetime(2026, 11, 8, 15, 30)
+            at = lambda *a: datetime(*a).timestamp()
+            stats.record(tmp, "claude", "opus", "czat", {"input": 10, "cached": 100, "output": 5}, 2, at(2026, 11, 8, 15, 5))
+            stats.record(tmp, "claude", "opus", "debata", {"input": 1, "cached": 0, "output": 1}, 1, at(2026, 11, 8, 9, 59))
+            stats.record(tmp, "codex", None, "czat", {"input": 7, "cached": 0, "output": 3}, 1, at(2026, 11, 2, 0, 0))
+            stats.record(tmp, "codex", None, "czat", {"input": 7, "cached": 0, "output": 3}, 1, at(2026, 11, 1, 23, 59))
+            self.assertFalse(stats.record(tmp, "haiku", None, "czat", {}, 0), "an empty run is not written")
+            with open(Path(tmp) / stats.FILE, "a", encoding="utf-8") as fh:
+                fh.write('{"ts": 1, "agent": "x"\n')  # cut short by a crash
+            week = stats.summarize(tmp, "7d", now)
+            self.assertEqual([b["label"] for b in week["buckets"]][0], "02.11")
+            self.assertEqual(week["buckets"][0]["by"]["codex"], {"runs": 1, "input": 7, "cached": 0, "output": 3},
+                             "the day before the range is left out")
+            self.assertEqual(week["buckets"][-1]["by"]["claude"]["runs"], 2)
+            self.assertEqual(week["totals"]["claude"], {"runs": 2, "calls": 3, "input": 11, "cached": 100, "output": 6})
+            self.assertEqual(week["kinds"]["debata"], {"input": 1, "cached": 0, "output": 1})
+            day = stats.summarize(tmp, "24h", now)
+            self.assertTrue(day["hourly"])
+            self.assertEqual(len(day["buckets"]), 24)
+            self.assertEqual(day["buckets"][-1]["label"], "15:00")
+            self.assertEqual(day["buckets"][-1]["by"]["claude"]["output"], 5)
+            self.assertEqual(day["buckets"][-7]["by"]["claude"]["output"], 1, "09:59 lands in the 09:00 bucket")
+            self.assertNotIn("codex", day["totals"])
+            self.assertEqual(stats.summarize(tmp, "zły")["range"], "7d")
 
     def test_update_check_and_safe_swap(self):
         import hashlib, io
@@ -567,6 +613,25 @@ class Runs(unittest.TestCase):
                 events.append(("usage", {"call": "c", "model": None, "context": core.CONTEXT_WARN + 1}))
             return events
         return mock.patch.object(core, "parse_event", parse)
+
+    def test_every_run_is_written_to_token_statistics(self):
+        def parse(agent, obj):
+            events = parse_event("gemini", obj)
+            if obj.get("type") == "result":
+                events.append(("tokens", {"call": "c", "input": 120, "cached": 800, "output": 30}))
+            return events
+        with mock.patch.object(core, "parse_event", parse):
+            self.session.send("@gemini hej", "claude")
+            self.wait_idle()
+            rows = stats.read(self.dir / core.STATE_DIR)
+            self.session.new_chat()  # the memory update is a second run
+        self.assertEqual([r["kind"] for r in stats.read(self.dir / core.STATE_DIR)], ["czat", "pamięć"],
+                         "statistics outlive a new chat")
+        self.assertEqual([(r["agent"], r["kind"], r["input"], r["cached"], r["output"]) for r in rows],
+                         [("gemini", "czat", 120, 800, 30)])
+        totals = self.session.token_stats("24h")["totals"]
+        self.assertEqual((totals["gemini"]["output"], totals["haiku"]["output"]), (30, 30),
+                         "the memory run counts for its engine")
 
     def test_oversized_session_is_replaced_automatically(self):
         with self.big_context():

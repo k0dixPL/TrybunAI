@@ -176,12 +176,23 @@ def _tool_summary(name, params):
 def parse_event(agent_id, obj):
     """Translate one JSON line into (kind, value) tuples.
 
-    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits, usage, denied.
+    Kinds: session, text, break (new assistant message), activity, warn, fatal, limits, usage, tokens, denied.
+    "usage" is the context size of one model call; "tokens" is what that call (or the whole run) consumed.
     """
     if not isinstance(obj, dict):
         return []
     return {"claude": _parse_claude, "codex": _parse_codex, "gemini": _parse_gemini,
             "antigravity": _parse_antigravity}[_family(agent_id)](obj)
+
+
+def _split_tokens(call, usage, *cached_keys):
+    """("tokens", ...) from a usage dict whose input_tokens already include the cached part."""
+    usage = usage if isinstance(usage, dict) else {}
+    num = lambda v: v if isinstance(v, (int, float)) else 0
+    total = num(usage.get("input_tokens"))
+    cached = next((num(usage[k]) for k in cached_keys if usage.get(k)), 0)
+    return ("tokens", {"call": call, "input": max(total - cached, 0), "cached": min(cached, total),
+                       "output": num(usage.get("output_tokens"))})
 
 
 def _parse_claude(o):
@@ -212,6 +223,11 @@ def _parse_claude(o):
                           ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
             events.append(("usage", {"call": message.get("id"), "model": message.get("model"),
                                      "context": context}))
+            events.append(("tokens", {"call": message.get("id"),
+                                      "input": (usage.get("input_tokens") or 0)
+                                      + (usage.get("cache_creation_input_tokens") or 0),
+                                      "cached": usage.get("cache_read_input_tokens") or 0,
+                                      "output": usage.get("output_tokens") or 0}))
         return events
     elif kind == "result":
         events = [_denied(d.get("tool_name"), d.get("tool_input")) for d in o.get("permission_denials") or []
@@ -227,6 +243,8 @@ def _parse_codex(o):
     kind = o.get("type")
     if kind == "thread.started":
         return [("session", o.get("thread_id"))]
+    if kind == "turn.completed":
+        return [_split_tokens("turn", o.get("usage"), "cached_input_tokens")]
     if kind == "turn.failed":
         return [("fatal", str((o.get("error") or {}).get("message", "Codex: tura nieudana")))]
     if kind == "error":
@@ -255,6 +273,9 @@ def _parse_gemini(o):
         return [("break", None), ("activity", _tool_summary(o.get("tool_name"), o.get("parameters")))]
     if kind == "error":
         return [("warn", str(o.get("message", "")))]
+    if kind == "result" and isinstance(o.get("stats"), dict):
+        stats = o["stats"]
+        return [_split_tokens("result", stats, "cached")] + _parse_gemini({**o, "stats": None})
     if kind == "result" and o.get("status") == "error":
         err = o.get("error") or {}
         return [("fatal", str(err.get("message") if isinstance(err, dict) else err))]
@@ -277,8 +298,9 @@ def _parse_antigravity(o):
         events = [("text", step["text_delta"])] if step.get("text_delta") else []
         usage = step.get("usage") or {}
         if step.get("state") == "DONE" and usage:
-            events.append(("usage", {"call": f"{step.get('conversation_id')}:{step.get('step_index')}",
-                                     "model": None, "context": usage.get("input_tokens") or 0}))
+            call = f"{step.get('conversation_id')}:{step.get('step_index')}"
+            events.append(("usage", {"call": call, "model": None, "context": usage.get("input_tokens") or 0}))
+            events.append(_split_tokens(call, usage, "cached_input_tokens", "cache_read_input_tokens"))
         return events
     if step.get("step_type") == "tool" and step.get("state") == "ACTIVE":
         info = step.get("tool_info") or {}

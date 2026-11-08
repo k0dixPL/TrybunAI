@@ -135,6 +135,9 @@ class Api:
     def map_info(self):
         return self._session.map_info()
 
+    def token_stats(self, range_key="7d"):
+        return self._session.token_stats(range_key)
+
     def open_map_folder(self):
         folder = self._session.refresh_map().get("folder")
         if folder:

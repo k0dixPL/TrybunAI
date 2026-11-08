@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import limits, mapa, models, setup
+from . import limits, mapa, models, setup, stats
 from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
                      is_safe_arg, parse_event, session_name, stdin_payload)
 from .remote import RemoteControl
@@ -295,11 +295,18 @@ class _Result:
         self.calls = set()  # one model call arrives split over several events
         self.model = None
         self.context = 0
+        self.tokens = {}  # call id -> {"input", "cached", "output"}; a call's usage repeats, so keep the max
 
     def usage(self):
         if not self.calls:
             return None
         return {"model": self.model, "context": self.context, "calls": len(self.calls)}
+
+    def token_total(self):
+        total = {}
+        for part in self.tokens.values():
+            stats.add_tokens(total, part)
+        return total
 
     @property
     def ok(self):
@@ -677,7 +684,12 @@ class Session:
             name = session_name(self.project.name, "" if agent == "claude" else agent)
             cmd = build_command(agent, self._binaries[agent], mode, state.get("id"), model, images=images,
                                 name=name)
-            result = self._execute(agent, agent, cmd, prompt, run_id)
+            kind = "czat"
+            if turn_label:
+                kind = ("debata" if turn_label.startswith("runda") else
+                        "sprawdzenie" if turn_label.startswith(("sprawdzenie", "ponowne")) else
+                        "wdrożenie" if turn_label.startswith(("wdrożenie", "poprawki")) else "czat")
+            result = self._execute(agent, agent, cmd, prompt, run_id, kind=kind)
         except Exception as exc:  # the UI must always get an "end", or the bubble spins forever
             result.fatal = f"{type(exc).__name__}: {exc}"
         lost_session = bool(state.get("id")) and not result.ok and _session_was_lost(result)
@@ -1045,8 +1057,25 @@ class Session:
                    "error": None if ok or result.stopped else result.error_message()})
 
     # ---- processes -------------------------------------------------------
-    def _execute(self, key, agent, cmd, prompt, run_id):
+    def _execute(self, key, agent, cmd, prompt, run_id, kind=None):
         result = _Result()
+        try:
+            return self._execute_inner(key, agent, cmd, prompt, run_id, result)
+        finally:
+            self._record_tokens(agent, result, kind or {"memory": "pamięć", "prompter": "prompter"}.get(key, "czat"))
+
+    def _record_tokens(self, agent, result, kind):
+        """Statistics never break a turn: a failed write only loses one line."""
+        try:
+            stats.record(self.project / STATE_DIR, agent, result.model, kind, result.token_total(),
+                         len(result.calls) or len(result.tokens))
+        except (OSError, ValueError):
+            pass
+
+    def token_stats(self, range_key="7d"):
+        return stats.summarize(self.project / STATE_DIR, range_key)
+
+    def _execute_inner(self, key, agent, cmd, prompt, run_id, result):
         env = {k: v for k, v in os.environ.items() if k not in _STRIP_ENV}
         proc = subprocess.Popen(
             cmd, cwd=self.project, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -1113,6 +1142,10 @@ class Session:
         elif kind == "denied" and isinstance(value, dict):
             if value not in result.denied and len(result.denied) < 8:
                 result.denied.append(value)
+        elif kind == "tokens" and isinstance(value, dict):
+            seen = result.tokens.setdefault(str(value.get("call")), {})
+            for key in stats.FIELDS:
+                seen[key] = max(seen.get(key, 0), int(value.get(key) or 0))
         elif kind == "usage" and isinstance(value, dict):
             result.calls.add(value.get("call"))
             result.model = value.get("model") or result.model

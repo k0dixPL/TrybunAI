@@ -33,8 +33,12 @@ TrybunAI to jeden plik `.exe`, który steruje narzędziami AI do programowania (
 - **Zgody na żądanie:** gdy model chce zrobić coś ponad swoje uprawnienia, widzisz co dokładnie i możesz jednorazowo pozwolić.
 - **Pamięć projektu:** zwięzłe ustalenia zamiast ogromnej historii; długie sesje odświeżają się same, co oszczędza limity.
 - **Limity:** plan i zużycie limitów każdego konta w Ustawieniach, rozmiar kontekstu przy każdej odpowiedzi.
+- **Mapa projektu:** krótkie notatki o kodzie (pliki, funkcje z numerami linii, zależności) i dziennik zmian modeli. Nowa sesja zaczyna od mapy zamiast przeszukiwać cały program, co oszczędza tokeny.
+- **Statystyki:** zużycie tokenów w czasie na wykresie, z podziałem na modele (24 h, 7, 30 i 90 dni).
 - **Uprawnienia na model:** tylko odczyt, edycja plików albo pełny dostęp. Debaty zawsze tylko do odczytu.
 - **Prompter:** przepisuje szybką notatkę na porządny prompt.
+
+<p align="center"><img src="docs/statystyki.png" width="620" alt="Okno Statystyki: zużycie tokenów w czasie z podziałem na modele"></p>
 
 ## Jak zacząć
 

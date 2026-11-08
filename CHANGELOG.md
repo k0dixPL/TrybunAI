@@ -1,5 +1,14 @@
 # Zmiany
 
+## 1.0.15 — 2026-11-08
+- Statystyki (przycisk na górze): zużycie tokenów w czasie na wykresie słupkowym z podziałem na modele,
+  za 24 godziny (co godzinę), 7, 30 albo 90 dni (co dzień). Do wyboru: nowe wejście + wyjście, wszystko
+  z odczytem z cache albo samo wyjście. Po najechaniu na słupek: wartości dla każdego modelu; pod wykresem
+  tabela z sumami.
+- Każde uruchomienie modelu (czat, debata, wdrożenie, sprawdzanie, Prompter, pamięć) zapisuje swoje
+  tokeny do `.trybunai/tokeny.jsonl`, który przetrwa „Nową rozmowę”. Liczby z Claude/Haiku, Codexa,
+  Antigravity i Gemini.
+
 ## 1.0.14 — 2026-11-08
 - Mapa projektu: przy każdej sygnaturze numer linii (`# L120`), więc model czyta od razu właściwy fragment.
 - Pliki od 800 linii dostają sekcję „Mapa pliku” ze wszystkimi funkcjami i metodami, także prywatnymi

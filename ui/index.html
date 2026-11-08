@@ -130,6 +130,36 @@ dialog input.rolepick{width:340px}
 #mapdlg{width:640px;max-height:90vh}
 #mapindex{white-space:pre-wrap;font:12px/1.45 Consolas,monospace;background:var(--panel2);border-radius:6px;padding:8px 10px;max-height:42vh;overflow:auto;margin:8px 0}
 #mapindex:empty{display:none}
+#statsdlg{width:780px;max-width:94vw;max-height:92vh}
+#statsdlg .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;color:var(--dim)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--panel2);color:var(--text)}
+#statshero{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:4px 0 10px}
+#statshero b{font-size:28px;font-weight:600;font-variant-numeric:tabular-nums}
+#statshero span{color:var(--dim);font-size:13px}
+#statschart{position:relative}
+#statschart svg{display:block;width:100%;height:auto}
+#statschart .grid{stroke:var(--line);stroke-width:1}
+#statschart .axis{fill:var(--dim);font-size:11px;font-variant-numeric:tabular-nums}
+#statschart .hit{fill:transparent;cursor:default}
+#statschart .hit:hover{fill:#ffffff0c}
+#statstip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  padding:7px 10px;font-size:12.5px;min-width:170px;box-shadow:0 6px 18px #0007;z-index:2}
+#statstip .row{display:flex;align-items:center;gap:7px;justify-content:space-between}
+#statstip .row span:first-child{display:flex;align-items:center;gap:6px;color:var(--dim)}
+#statstip b{font-variant-numeric:tabular-nums;font-weight:600}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+#statslegend{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 4px;font-size:13px;color:var(--dim)}
+#statslegend span{display:flex;align-items:center;gap:6px}
+#statstable{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+#statstable th{color:var(--dim);font-weight:500;text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}
+#statstable td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+#statstable th:first-child,#statstable td:first-child{text-align:left}
+#statstable td:first-child .sw{margin-right:7px;vertical-align:-1px}
+#statstable tr.sum td{font-weight:600;border-bottom:0}
+#statsempty{color:var(--dim);text-align:center;padding:40px 10px}
 #maplog{font-size:12.5px;color:var(--dim);max-height:20vh;overflow:auto}#maplog div{margin:2px 0}
 #mapstate,#startstate{font-size:13px;margin:4px 0}
 dialog input#mapexclude{width:250px}
@@ -157,6 +187,7 @@ dialog input#mapexclude{width:250px}
   <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
   <button id="mapbtn" title="Mapa projektu: krótkie notatki o kodzie, od których modele zaczynają">Mapa</button>
+  <button id="statsbtn" title="Zużycie tokenów w czasie, z podziałem na modele">Statystyki</button>
   <button id="newchat" class="iconbtn" title="Nowa rozmowa (zapisuje stan do pamięci projektu)" aria-label="Nowa rozmowa">📄</button>
   <button id="aboutbtn" class="iconbtn" title="O programie i aktualizacje" aria-label="O programie">?<span id="newdot" hidden></span></button>
 </header>
@@ -213,6 +244,7 @@ dialog input#mapexclude{width:250px}
     <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
     <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
     <p><b>Mapa</b> (na górze) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
+    <p><b>Statystyki</b> (na górze) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”.</p>
     <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
     <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu oraz plany i limity kont. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
   </div>
@@ -246,6 +278,26 @@ dialog input#mapexclude{width:250px}
   </fieldset>
   <small>Mapa leży w <code>.trybunai/mapa</code>: INDEX.md z listą plików i notatka dla każdego modułu Pythona (publiczne funkcje i klasy, kto od kogo zależy). Nowa sesja modelu dostaje tylko wskazówkę, żeby od niej zacząć, oraz ostatnie zmiany; trwająca sesja dostaje zmiany innych modeli. Folder otworzysz jako vault w Obsidianie (graf). Sekcje „Uwagi (ręczne)” możesz uzupełniać: generator ich nie nadpisuje.</small>
   <menu><button id="mapclose" type="button">Zamknij</button></menu>
+</dialog>
+<dialog id="statsdlg">
+  <h3>Zużycie tokenów</h3>
+  <div class="filters">
+    <div class="seg" id="statsrange" role="group" aria-label="Okres">
+      <button type="button" data-r="24h">24 godziny</button><button type="button" data-r="7d" class="on">7 dni</button><button type="button" data-r="30d">30 dni</button><button type="button" data-r="90d">90 dni</button>
+    </div>
+    <select id="statsmeasure" aria-label="Co liczyć">
+      <option value="fresh">Nowe wejście + wyjście</option>
+      <option value="all">Wszystko, także odczyt z cache</option>
+      <option value="output">Tylko wyjście</option>
+    </select>
+  </div>
+  <div id="statshero"></div>
+  <div id="statschart"><div id="statstip" hidden></div></div>
+  <div id="statslegend"></div>
+  <div id="statsempty" hidden>Brak danych w tym okresie. Statystyki zbierają się od wersji 1.0.15 po każdej odpowiedzi modelu.</div>
+  <table id="statstable"></table>
+  <small>Nowe wejście to tekst, który model czyta pierwszy raz (prompt, pliki, wyniki narzędzi). Odczyt z cache to powtórnie czytany początek sesji: bywa go setki tysięcy na krok, ale jest dużo tańszy i słabiej obciąża limity. Wyjście to tekst napisany przez model. Codex podaje sumę na całą turę, Antigravity tylko dla części kroków. Dane leżą w <code>.trybunai/tokeny.jsonl</code> i przetrwają „Nową rozmowę”.</small>
+  <menu><button id="statsclose" type="button">Zamknij</button></menu>
 </dialog>
 <dialog id="dlg"><form method="dialog">
   <h3>Ustawienia</h3>
@@ -669,6 +721,130 @@ async function showMap(refresh) {
     const d = document.createElement("div"); d.textContent = t; return d; }));
 }
 
+// ---- token statistics -------------------------------------------------
+const STATS_ORDER = ["claude", "codex", "haiku", "antigravity", "gemini"];  // stacking order, checked for colour-blind contrast
+const STATS_LABEL = {fresh: "nowe wejście + wyjście", all: "wszystkie tokeny", output: "wyjście"};
+let statsRange = "7d", statsData = null;
+const statsValue = (c, m) => !c ? 0 : m === "output" ? c.output : m === "all" ? c.input + c.cached + c.output : c.input + c.output;
+function compact(n) { return compactRaw(n).replace(",0 ", " "); }
+function compactRaw(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(n >= 1e10 ? 0 : 1).replace(".", ",") + " mld";
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(".", ",") + " mln";
+  if (n >= 1e3) return Math.round(n / 1e3) + " tys.";
+  return String(Math.round(n));
+}
+const full = n => Math.round(n).toLocaleString("pl-PL");
+const agentColor = a => `var(--${a in S.agents ? a : "dim"})`;
+const agentLabel = a => S.agents[a]?.label || a;
+function niceStep(v) {  // a round grid step (1, 2 or 5 × 10^n) giving about four lines up to v
+  if (v <= 0) return 1;
+  const raw = v / 4, p = 10 ** Math.floor(Math.log10(raw)), f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+async function showStats() {
+  document.querySelectorAll("#statsrange button").forEach(b => b.classList.toggle("on", b.dataset.r === statsRange));
+  statsData = await api.token_stats(statsRange);
+  drawStats();
+}
+function drawStats() {
+  const d = statsData, m = $("statsmeasure").value;
+  const agents = [...STATS_ORDER.filter(a => d.totals[a]), ...Object.keys(d.totals).filter(a => !STATS_ORDER.includes(a))];
+  const empty = !agents.length;
+  $("statsempty").hidden = !empty;
+  for (const id of ["statshero", "statslegend", "statstable"]) $(id).hidden = empty;
+  const chart = $("statschart"), tip = $("statstip");
+  chart.querySelector("svg")?.remove(); tip.hidden = true;
+  if (empty) return;
+
+  const sum = k => agents.reduce((t, a) => t + d.totals[a][k], 0);
+  const total = agents.reduce((t, a) => t + statsValue(d.totals[a], m), 0);
+  $("statshero").innerHTML = "";
+  const big = document.createElement("b"); big.textContent = compact(total);
+  const sub = document.createElement("span");
+  sub.textContent = `${STATS_LABEL[m]} · ${full(sum("runs"))} uruchomień · nowe wejście ${compact(sum("input"))}, ` +
+    `z cache ${compact(sum("cached"))}, wyjście ${compact(sum("output"))}`;
+  $("statshero").append(big, sub);
+
+  // Stacked bars: one per bucket, segments in fixed model order, 2px gaps, rounded top.
+  const W = 740, H = 230, L = 52, R = 6, T = 8, B = 24, n = d.buckets.length;
+  const totals = d.buckets.map(b => agents.reduce((t, a) => t + statsValue(b.by[a], m), 0));
+  const step = niceStep(Math.max(...totals)), lines = Math.max(1, Math.ceil(Math.max(...totals) / step)), max = step * lines;
+  const slot = (W - L - R) / n, bw = Math.max(2, Math.min(28, slot * 0.68));
+  const y = v => T + (H - T - B) * (1 - v / max);
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Wykres zużycia tokenów"});
+  for (let i = 0; i <= lines; i++) {
+    const v = step * i, yy = y(v);
+    svg.append(el("line", {x1: L, x2: W - R, y1: yy, y2: yy, class: "grid"}));
+    const t = el("text", {x: L - 8, y: yy + 4, "text-anchor": "end", class: "axis"}); t.textContent = compact(v); svg.append(t);
+  }
+  const every = Math.ceil(n / 10);
+  d.buckets.forEach((b, i) => {
+    const cx = L + slot * i + slot / 2, x = cx - bw / 2;
+    let base = y(0), top = null;
+    const segs = agents.map(a => [a, statsValue(b.by[a], m)]).filter(([, v]) => v > 0);
+    segs.forEach(([a, v], k) => {
+      const h = y(0) - y(v), gap = k ? 2 : 0, hh = Math.max(h - gap, 1);
+      const yTop = base - gap - hh, last = k === segs.length - 1, r = last ? Math.min(4, hh, bw / 2) : 0;
+      const path = `M${x},${base - gap}V${yTop + r}${r ? `Q${x},${yTop} ${x + r},${yTop}H${x + bw - r}Q${x + bw},${yTop} ${x + bw},${yTop + r}` : `H${x + bw}`}V${base - gap}Z`;
+      svg.append(el("path", {d: path, fill: agentColor(a)}));
+      base = yTop; top = yTop;
+    });
+    if ((n - 1 - i) % every === 0) {
+      const t = el("text", {x: cx, y: H - 6, "text-anchor": "middle", class: "axis"}); t.textContent = b.label; svg.append(t);
+    }
+    const hit = el("rect", {x: L + slot * i, y: T, width: slot, height: H - T - B, class: "hit"});
+    hit.addEventListener("mouseenter", () => showTip(i, cx, top ?? y(0)));
+    hit.addEventListener("mouseleave", () => { tip.hidden = true; });
+    svg.append(hit);
+  });
+  chart.prepend(svg);
+
+  function showTip(i, cx, yTop) {
+    const b = d.buckets[i], rows = agents.filter(a => b.by[a]);
+    const day = d.hourly ? `${b.label}–${String((+b.label.slice(0, 2) + 1) % 24).padStart(2, "0")}:00` : b.label;
+    tip.replaceChildren();
+    const head = document.createElement("div"); head.style.cssText = "margin-bottom:4px;color:var(--text)";
+    head.textContent = day; tip.append(head);
+    const line = (swatch, name, val) => {
+      const r = document.createElement("div"); r.className = "row";
+      const left = document.createElement("span");
+      if (swatch) { const s = document.createElement("i"); s.className = "sw"; s.style.background = swatch; left.append(s); }
+      left.append(name);
+      const v = document.createElement("b"); v.textContent = val; r.append(left, v); tip.append(r);
+    };
+    if (!rows.length) line(null, "brak użycia", "0");
+    rows.forEach(a => line(agentColor(a), `${agentLabel(a)} (${b.by[a].runs}×)`, full(statsValue(b.by[a], m))));
+    if (rows.length > 1) line(null, "razem", full(rows.reduce((t, a) => t + statsValue(b.by[a], m), 0)));
+    tip.hidden = false;
+    const scale = chart.clientWidth / W, left = cx * scale, w = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(chart.clientWidth - w, left - w / 2)) + "px";
+    tip.style.top = Math.max(0, yTop * scale - tip.offsetHeight - 8) + "px";
+  }
+
+  $("statslegend").replaceChildren(...agents.map(a => {
+    const s = document.createElement("span"), sw = document.createElement("i");
+    sw.className = "sw"; sw.style.background = agentColor(a); s.append(sw, agentLabel(a)); return s;
+  }));
+
+  const table = $("statstable"); table.replaceChildren();
+  const tr = (cells, cls, th) => {
+    const r = document.createElement("tr"); if (cls) r.className = cls;
+    cells.forEach(c => { const td = document.createElement(th ? "th" : "td"); td.append(c); r.append(td); });
+    table.append(r);
+  };
+  tr(["Model", "Uruchomienia", "Nowe wejście", "Odczyt z cache", "Wyjście", "Razem"], null, true);
+  agents.forEach(a => {
+    const t = d.totals[a], sw = document.createElement("i"); sw.className = "sw"; sw.style.background = agentColor(a);
+    const name = document.createDocumentFragment(); name.append(sw, agentLabel(a));
+    tr([name, full(t.runs), full(t.input), full(t.cached), full(t.output), full(t.input + t.cached + t.output)]);
+  });
+  if (agents.length > 1)
+    tr(["Razem", full(sum("runs")), full(sum("input")), full(sum("cached")), full(sum("output")),
+        full(sum("input") + sum("cached") + sum("output"))], "sum");
+}
+
 async function openAbout() {
   about = about || await api.about();
   $("aboutver").textContent = about.version; $("aboutauthor").textContent = about.author;
@@ -902,6 +1078,10 @@ window.addEventListener("pywebviewready", async () => {
   $("maprefresh").onclick = () => showMap(true);
   $("mapopen").onclick = () => api.open_map_folder();
   $("mapclose").onclick = () => $("mapdlg").close();
+  $("statsbtn").onclick = () => { $("statsdlg").showModal(); showStats(); };
+  $("statsclose").onclick = () => $("statsdlg").close();
+  $("statsmeasure").onchange = () => statsData && drawStats();
+  document.querySelectorAll("#statsrange button").forEach(b => b.onclick = () => { statsRange = b.dataset.r; showStats(); });
   $("startfiles").onclick = async () => {
     const r = await api.start_files(), out = [];
     if (r.created.length) out.push("Utworzono: " + r.created.join(", "));
