@@ -129,6 +129,20 @@ class Api:
         threading.Timer(0.5, self._window.destroy).start()
         return {"ok": True, "version": info["version"]}
 
+    def refresh_map(self):
+        return self._session.refresh_map()
+
+    def map_info(self):
+        return self._session.map_info()
+
+    def open_map_folder(self):
+        folder = self._session.refresh_map().get("folder")
+        if folder:
+            os.startfile(folder)
+
+    def start_files(self):
+        return self._session.start_files()
+
     def retry_with(self, agent, mode):
         return self._session.retry_with(agent, mode)
 

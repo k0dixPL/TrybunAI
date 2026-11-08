@@ -1,5 +1,16 @@
 # Zmiany
 
+## 1.0.13 — 2026-11-08
+- Mapa projektu (`.trybunai/mapa`, przycisk „Mapa” na górze): INDEX.md z listą plików i notatka dla każdego
+  modułu Pythona (pierwsza linia opisu, publiczne sygnatury, „Zależy od” / „Używany przez” z importów).
+  Odświeżana przyrostowo, sekcja „Uwagi (ręczne)” nigdy nie jest nadpisywana, folder działa jako vault
+  Obsidiana. Bez adresów IP, haseł i wartości domyślnych z tekstem; katalogi z danymi do pominięcia
+  w Ustawieniach (domyślnie „obiekty”).
+- Nowa sesja modelu dostaje wskazówkę „zacznij od mapy” i ostatnie zmiany zamiast przeszukiwać program.
+- Dziennik ZMIANY.md (30 ostatnich wpisów): po każdej turze z edycją kto, co i w których plikach.
+  Trwająca sesja innego modelu dostaje nowe wpisy przy swojej następnej turze.
+- „Pliki startowe”: tworzy brakujące CLAUDE.md, AGENTS.md i GEMINI.md z odsyłaczem do REGULY.md i mapy.
+
 ## 1.0.12 — 2026-11-08
 - „O programie” (link na dole): wersja, autor, licencja MIT, linki do GitHuba i strony oraz opis
   wszystkich elementów programu.

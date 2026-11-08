@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from trybun import core, limits, models, setup, update  # noqa: E402
+from trybun import core, limits, mapa, models, setup, update  # noqa: E402
 from trybun.agents import (build_command, build_remote_command, parse_event, session_name,  # noqa: E402
                            stdin_payload)
 from trybun.remote import RemoteControl  # noqa: E402
@@ -341,6 +341,7 @@ class Runs(unittest.TestCase):
         dialect.start()
         self.addCleanup(dialect.stop)
         self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(self.session.shutdown)  # runs first: waits for map refreshes
 
     def wait_idle(self):
         deadline = time.time() + 20
@@ -660,6 +661,35 @@ class Runs(unittest.TestCase):
         self.assertTrue(list((self.dir / ".trybunai").glob("chat-*.json")))
 
 
+    def test_map_hint_for_fresh_session_and_changes_for_live_one(self):
+        self.session.send("@claude hej", "claude")
+        self.wait_idle()
+        first = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("Mapa projektu: .trybunai/mapa/INDEX.md", first)
+        self.assertIn("[[fake]]", (self.dir / ".trybunai" / "mapa" / "INDEX.md").read_text(encoding="utf-8"))
+        self.session.update_settings({"modes": {"codex": "edit"}})
+        self.session.send("@codex popraw. Reszta opisu.", "claude")
+        self.wait_idle()
+        log = core.mapa.read_log(self.dir)
+        self.assertEqual(len(log), 1)
+        self.assertIn("[Codex] odp zażółć | pliki: last_prompt.txt", log[0])
+        self.session.send("@claude dalej", "claude")
+        self.wait_idle()
+        live = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("Od twojej ostatniej tury inne modele zmieniły pliki", live)
+        self.assertIn("[Codex] odp zażółć", live)
+        self.assertNotIn("INDEX.md", live)
+        self.session.send("@claude znowu", "claude")
+        self.wait_idle()
+        self.assertEqual((self.dir / "last_prompt.txt").read_text(encoding="utf-8"), "znowu")
+        self.session.update_settings({"map": False})
+        self.session.new_chat(save_state=False)
+        self.session.send("@claude bez mapy", "claude")
+        self.wait_idle()
+        self.assertNotIn("Mapa projektu", (self.dir / "last_prompt.txt").read_text(encoding="utf-8"))
+        self.assertFalse(self.session.update_settings({"map_exclude": ["../x"]})["ok"])
+
+
 class Installer(unittest.TestCase):
     """The real flow with installers and windows replaced: nothing is installed here."""
 
@@ -732,6 +762,114 @@ class Installer(unittest.TestCase):
         self.addCleanup(os.environ.__setitem__, "PATH", before)
         setup.refresh_path()
         self.assertTrue(os.environ["PATH"].endswith(before))
+
+
+class ProjectMap(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        (self.dir / "pkg").mkdir()
+        (self.dir / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+        (self.dir / "pkg" / "baza.py").write_text(
+            '"""Połączenie z bazą."""\n'
+            'HOST = "10.0.0.5"\n'
+            'def polacz(host="192.168.1.10", port=22, haslo="tajne123", *, timeout=5):\n    return 1\n'
+            'def _ukryta():\n    pass\n'
+            'class Klient:\n    def wyslij(self, dane): pass\n    def _wew(self): pass\n',
+            encoding="utf-8")
+        (self.dir / "pkg" / "zakladka.py").write_text(
+            "from . import baza\nfrom .baza import Klient\nimport json\n"
+            + "".join(f"def f{i}(): pass\n" for i in range(45)), encoding="utf-8")
+        (self.dir / "main.py").write_text("import pkg.zakladka\n", encoding="utf-8")
+        (self.dir / "ui").mkdir()
+        (self.dir / "ui" / "app.js").write_text("x", encoding="utf-8")
+        (self.dir / "obiekty").mkdir()
+        (self.dir / "obiekty" / "klient_kowalski.py").write_text("def x(): pass\n", encoding="utf-8")
+        (self.dir / "node_modules").mkdir()
+        (self.dir / "node_modules" / "lib.js").write_text("x", encoding="utf-8")
+        self.folder = mapa.map_dir(self.dir)
+
+    def generate(self, **kwargs):
+        return mapa.generate(self.dir, core._SKIP_DIRS, **kwargs)
+
+    def test_notes_links_signatures_and_secrets(self):
+        stats = self.generate()
+        self.assertEqual(stats["modules"], 4)
+        index = (self.folder / "INDEX.md").read_text(encoding="utf-8")
+        self.assertIn("[[pkg.baza]] — Połączenie z bazą.", index)
+        self.assertIn("`ui/app.js`", index)
+        self.assertNotIn("kowalski", index, "excluded data folder")
+        self.assertNotIn("lib.js", index)
+        self.assertFalse((self.folder / "obiekty.klient_kowalski.md").exists())
+        baza = (self.folder / "pkg.baza.md").read_text(encoding="utf-8")
+        self.assertIn("def polacz(host=…, port=22, haslo=…, *, timeout=5)", baza)
+        self.assertIn("class Klient\n    def wyslij(self, dane)", baza)
+        for leak in ("192.168", "10.0.0.5", "tajne123", "_ukryta", "_wew"):
+            self.assertNotIn(leak, baza)
+        self.assertIn("Używany przez: [[pkg.zakladka]]", baza)
+        tab = (self.folder / "pkg.zakladka.md").read_text(encoding="utf-8")
+        self.assertIn("Zależy od: [[pkg.baza]]", tab)
+        self.assertIn("Używany przez: [[main]]", tab)
+        self.assertIn("(+5 więcej)", tab)
+        self.assertNotIn("json", tab)
+
+    def test_manual_section_survives_and_refresh_is_incremental(self):
+        self.generate()
+        note = self.folder / "pkg.baza.md"
+        text = note.read_text(encoding="utf-8").replace(
+            "<!-- reczne -->\n", "<!-- reczne -->\nUwaga: nie zmieniać portu.\n")
+        note.write_text(text, encoding="utf-8")
+        self.assertEqual(self.generate()["parsed"], 0, "nothing changed, nothing parsed")
+        source = self.dir / "pkg" / "baza.py"
+        source.write_text(source.read_text(encoding="utf-8") + "def nowa(): pass\n", encoding="utf-8")
+        os.utime(source, ns=(time.time_ns(), time.time_ns() + 10**9))
+        stats = self.generate()
+        self.assertEqual(stats["parsed"], 1)
+        text = note.read_text(encoding="utf-8")
+        self.assertIn("def nowa()", text)
+        self.assertIn("Uwaga: nie zmieniać portu.", text)
+        source.unlink()
+        self.generate()
+        self.assertIn("Plik już nie istnieje", note.read_text(encoding="utf-8"), "hand notes are kept")
+
+    def test_excluded_folders_are_configurable(self):
+        self.generate(exclude=["ui", "pkg/zakladka.py"])
+        index = (self.folder / "INDEX.md").read_text(encoding="utf-8")
+        self.assertIn("[[obiekty.klient_kowalski]]", index)
+        self.assertNotIn("app.js", index)
+        self.assertNotIn("[[pkg.zakladka]]", index)
+
+    def test_log_keeps_newest_thirty(self):
+        for i in range(35):
+            mapa.append_log(self.dir, "Codex", f"Zmiana {i}. Dalszy opis.", [f"plik{i}.py"])
+        entries = mapa.read_log(self.dir)
+        self.assertEqual(len(entries), 30)
+        self.assertIn("[Codex] Zmiana 34. | pliki: plik34.py", entries[-1])
+        self.assertIn("Zmiana 5.", entries[0])
+        self.assertIsNone(mapa.append_log(self.dir, "Codex", "nic", []))
+        long = mapa.first_sentence("**Dodałem** " + "x" * 300)
+        self.assertEqual(len(long), 120)
+
+    def test_entries_since_and_prompt_note(self):
+        entries = ["2026-11-08 14:00 [Codex] a | pliki: a.py", "2026-11-08 14:01 [Claude] b | pliki: b.py",
+                   "2026-11-08 14:02 [Codex] c | pliki: c.py"]
+        self.assertEqual(mapa.entries_since(entries, entries[0], skip_label="Claude"), [entries[2]])
+        self.assertEqual(mapa.entries_since(entries, "wypadł z dziennika"), entries)
+        fresh = mapa.prompt_note(True, entries[:1])
+        self.assertIn(".trybunai/mapa/INDEX.md", fresh)
+        self.assertIn("- 2026-11-08 14:00 [Codex] a", fresh)
+        self.assertNotIn("INDEX.md", mapa.prompt_note(False, entries[:1]))
+        self.assertEqual(mapa.prompt_note(False, []), "")
+        self.assertTrue(build_turn_prompt([], "claude", "pytanie", project_map=fresh).endswith("pytanie"))
+
+    def test_start_files_never_overwrite(self):
+        (self.dir / "CLAUDE.md").write_text("moje", encoding="utf-8")
+        result = mapa.create_start_files(self.dir)
+        self.assertEqual((self.dir / "CLAUDE.md").read_text(encoding="utf-8"), "moje")
+        self.assertEqual(len(result["created"]), 2)
+        self.assertIn("REGULY.md", (self.dir / "AGENTS.md").read_text(encoding="utf-8"))
+        self.assertTrue(result["rules_missing"])
 
 
 class Remote(unittest.TestCase):

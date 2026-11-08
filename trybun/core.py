@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import limits, models, setup
+from . import limits, mapa, models, setup
 from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
                      is_safe_arg, parse_event, session_name, stdin_payload)
 from .remote import RemoteControl
@@ -163,13 +163,15 @@ def _speaker(msg):
     return AGENTS[msg["agent"]]["label"]
 
 
-def build_turn_prompt(messages, agent_id, text, include_own=False, memory="", role=""):
+def build_turn_prompt(messages, agent_id, text, include_own=False, memory="", role="", project_map=""):
     """Prepend whatever this agent has not seen, so all models share one conversation.
 
     A model normally remembers its own replies; a fresh session (include_own) does not,
     and starts from the project memory instead of the whole history.
     """
     prompt = _chat_context(messages, agent_id, text, include_own)
+    if project_map.strip():
+        prompt = f"{project_map.strip()}\n\n{prompt}"
     if role.strip():
         prompt = f"Twoja stała rola w tym zespole (ustawił ją użytkownik): {role.strip()}\n\n{prompt}"
     if memory.strip():
@@ -318,6 +320,8 @@ class Session:
         self.emit = emit
         self._lock = threading.RLock()
         self._memory_lock = threading.Lock()
+        self._map_lock = threading.Lock()
+        self._map_workers = []
         self._procs = {}
         self._busy = set()
         self._stop_requested = set()
@@ -335,7 +339,7 @@ class Session:
     def load(self):
         self.messages, self.sessions = [], {}
         self.settings = {"modes": {}, "target": "claude", "prompter": "haiku", "models": {},
-                         "everyone": default_everyone()}
+                         "everyone": default_everyone(), "map": True, "map_exclude": list(mapa.DEFAULT_EXCLUDE)}
         if self._state_path.exists():
             data = json.loads(self._state_path.read_text(encoding="utf-8"))
             self.messages = data.get("messages", [])
@@ -379,12 +383,18 @@ class Session:
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
             if any(m not in MODES for m in new["modes"].values()) or new["target"] not in AGENTS or new["prompter"] not in AGENTS:
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
-            if not isinstance(new.get("auto_fresh", True), bool):
+            if not isinstance(new.get("auto_fresh", True), bool) or not isinstance(new.get("map", True), bool):
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
             roles = new.get("roles", {})
             if not isinstance(roles, dict) or any(a not in AGENTS or not isinstance(r, str) or len(r) > 400
                                                   for a, r in roles.items()):
                 return {"ok": False, "error": "Nieprawidłowa rola (maks. 400 znaków)."}
+            exclude = new.get("map_exclude", [])
+            if not isinstance(exclude, list) or len(exclude) > 50 or any(
+                    not isinstance(e, str) or not e.strip() or len(e) > 200 or ".." in e or ":" in e
+                    for e in exclude):
+                return {"ok": False, "error": "Nieprawidłowa lista wykluczonych katalogów."}
+            new["map_exclude"] = [e.strip().replace("\\", "/").strip("/") for e in exclude]
             for model in new.get("models", {}).values():
                 if model and not is_safe_arg(model):
                     return {"ok": False, "error": f"Nieprawidłowa nazwa modelu: {model}"}
@@ -645,7 +655,8 @@ class Session:
         result = _Result()
         state = {}
         started = time.time()
-        before = self._scan_images()
+        before = self._scan_files()
+        log_seen = None
         try:
             with self._lock:
                 state = dict(self.sessions.get(agent) or {})
@@ -657,8 +668,10 @@ class Session:
                 body += "\n\nZałączone pliki (ścieżki względem folderu projektu):\n" + \
                     "\n".join(f"- {a}" for a in attachments)
             fresh = not state.get("id")
+            project_map, log_seen = self._map_note(agent, state, fresh)
             prompt = build_turn_prompt(unseen, agent, body, include_own=fresh,
-                                       memory=self.read_memory() if fresh else "", role=role)
+                                       memory=self.read_memory() if fresh else "", role=role,
+                                       project_map=project_map)
             images = [self._attachment_path(a) for a in attachments
                       if a.lower().endswith(IMAGE_SUFFIXES)] if agent == "codex" else []
             name = session_name(self.project.name, "" if agent == "claude" else agent)
@@ -670,15 +683,21 @@ class Session:
         lost_session = bool(state.get("id")) and not result.ok and _session_was_lost(result)
         status = "ok" if result.ok else ("stopped" if result.stopped else "error")
         error = None if status != "error" else result.error_message()
-        images = self._collect_images(agent, before, started, result.session or state.get("id"))
+        after = self._scan_files()
+        images = self._collect_images(agent, before, after, started, result.session or state.get("id"))
+        logged = status == "ok" and mode in ("edit", "full") and self._log_changes(agent, result.text, before, after)
         with self._lock:
             if lost_session:
                 # Fresh session next time, replaying the whole chat as context.
                 self.sessions[agent] = {"seen": 0}
                 error = (error or "") + "\n\nSesja tego modelu wygasła. Wyślij wiadomość ponownie."
             elif result.session:
-                seen = count if status != "error" else (self.sessions.get(agent) or {}).get("seen", 0)
+                old = self.sessions.get(agent) or {}
+                seen = count if status != "error" else old.get("seen", 0)
                 self.sessions[agent] = {"id": result.session, "seen": seen}
+                last_log = log_seen if status != "error" else old.get("log_seen")
+                if last_log:
+                    self.sessions[agent]["log_seen"] = last_log
             msg = self._new_message("assistant", agent=agent, text=result.text.strip(),
                                     status=status, error=error)
             usage = result.usage()
@@ -704,6 +723,10 @@ class Session:
             if not keep_busy and not refresh:
                 self._busy.discard(agent)
         self.emit({"t": "end", "id": run_id, "agent": agent, "message": msg})
+        if logged:  # notes of the changed modules, off the UI thread
+            worker = threading.Thread(target=self.refresh_map, daemon=True)
+            self._map_workers.append(worker)
+            worker.start()
         if refresh:  # the agent stays busy until its session is replaced
             threading.Thread(target=self._refresh_sessions, args=([agent], True), daemon=True).start()
         return status
@@ -714,6 +737,64 @@ class Session:
             return False
         last = next((m for m in reversed(self.messages) if m.get("agent") == agent), None)
         return bool(last and (last.get("usage") or {}).get("context", 0) >= CONTEXT_WARN)
+
+    # ---- project map -----------------------------------------------------
+    def _map_exclude(self):
+        return self.settings.get("map_exclude", mapa.DEFAULT_EXCLUDE)
+
+    def refresh_map(self):
+        """Regenerate the changed parts of .trybunai/mapa; safe to call from any thread."""
+        with self._map_lock:
+            try:
+                stats = mapa.generate(self.project, _SKIP_DIRS, self._map_exclude())
+            except Exception as exc:  # a broken map must never break a turn
+                return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        return {"ok": True, **stats, "folder": str(mapa.map_dir(self.project))}
+
+    def map_info(self):
+        index = mapa.map_dir(self.project) / mapa.INDEX
+        try:
+            text = index.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        return {"enabled": self.settings.get("map", True), "folder": str(index.parent), "index": text,
+                "log": mapa.read_log(self.project)}
+
+    def start_files(self):
+        return mapa.create_start_files(self.project)
+
+    def _map_note(self, agent, state, fresh):
+        """(text for the prompt, newest log entry): the map hint for a fresh session and
+        the changes other models made since this one's last turn."""
+        if not self.settings.get("map", True):
+            return "", None
+        index = mapa.map_dir(self.project) / mapa.INDEX
+        if fresh and not index.exists():
+            self.refresh_map()
+        entries = mapa.read_log(self.project)
+        last = entries[-1] if entries else None
+        label = None if fresh else AGENTS[agent]["label"]
+        new = mapa.entries_since(entries, None if fresh else state.get("log_seen"), skip_label=label)
+        try:
+            has_code = "[[" in index.read_text(encoding="utf-8")
+        except OSError:
+            has_code = False
+        return mapa.prompt_note(fresh and has_code, new), last
+
+    def _log_changes(self, agent, reply, before, after):
+        """Add a ZMIANY.md line when the turn changed files; True when it did."""
+        if not self.settings.get("map", True):
+            return False
+        exclude = self._map_exclude()
+        changed = [rel for rel in set(before) | set(after)
+                   if before.get(rel) != after.get(rel) and not mapa.is_excluded(rel, exclude)]
+        if not changed:
+            return False
+        try:
+            mapa.append_log(self.project, AGENTS[agent]["label"], reply, changed)
+        except OSError:
+            return False
+        return True
 
     # ---- project memory --------------------------------------------------
     @property
@@ -891,7 +972,8 @@ class Session:
         mime = {".jpg": "jpeg", ".jpeg": "jpeg"}.get(path.suffix.lower(), path.suffix.lower()[1:])
         return f"data:image/{mime};base64," + base64.b64encode(path.read_bytes()).decode()
 
-    def _scan_images(self):
+    def _scan_files(self):
+        """Every project file with its mtime, so a turn's changes can be found afterwards."""
         found, visited = {}, 0
         for folder, dirs, files in os.walk(self.project):
             dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
@@ -899,20 +981,18 @@ class Session:
             if visited > 50_000:  # huge tree: show what was found rather than stall every turn
                 break
             for name in files:
-                if name.lower().endswith(IMAGE_SUFFIXES):
-                    path = Path(folder) / name
-                    try:
-                        found[path.relative_to(self.project).as_posix()] = path.stat().st_mtime_ns
-                    except OSError:
-                        pass
+                path = Path(folder) / name
+                try:
+                    found[path.relative_to(self.project).as_posix()] = path.stat().st_mtime_ns
+                except OSError:
+                    pass
         return found
 
-    def _collect_images(self, agent, before, started, session):
+    def _collect_images(self, agent, before, current, started, session):
         """Images this turn created: changed project files plus Codex's private output folder."""
-        current = self._scan_images()
         with self._lock:
-            fresh = [rel for rel, mtime in current.items()
-                     if before.get(rel) != mtime and (rel, mtime) not in self._shown]
+            fresh = [rel for rel, mtime in current.items() if rel.lower().endswith(IMAGE_SUFFIXES)
+                     and before.get(rel) != mtime and (rel, mtime) not in self._shown]
             self._shown.update((rel, current[rel]) for rel in fresh)  # parallel runs must not both claim it
         if agent == "codex" and session:
             # In read-only mode the image stays here, so copy it where the chat can show it.
@@ -1064,6 +1144,8 @@ class Session:
             procs = list(self._procs.values())
         for proc in procs:
             self._kill(proc)
+        for worker in self._map_workers:  # a map write must not race the folder going away
+            worker.join(timeout=10)
 
 
 def _session_was_lost(result):

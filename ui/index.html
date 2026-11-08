@@ -127,6 +127,12 @@ dialog input.rolepick{width:340px}
 .iconbtn{min-width:36px;padding-left:9px;padding-right:9px;font-size:16px;line-height:1.2;position:relative}
 #aboutbtn{font-weight:700}
 #newdot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--codex)}
+#mapdlg{width:640px;max-height:90vh}
+#mapindex{white-space:pre-wrap;font:12px/1.45 Consolas,monospace;background:var(--panel2);border-radius:6px;padding:8px 10px;max-height:42vh;overflow:auto;margin:8px 0}
+#mapindex:empty{display:none}
+#maplog{font-size:12.5px;color:var(--dim);max-height:20vh;overflow:auto}#maplog div{margin:2px 0}
+#mapstate,#startstate{font-size:13px;margin:4px 0}
+dialog input#mapexclude{width:250px}
 #memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:12.5px;margin-top:4px}
 #limits .acct{margin:8px 0 10px}
 #limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
@@ -150,6 +156,7 @@ dialog input.rolepick{width:340px}
   <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
   <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
+  <button id="mapbtn" title="Mapa projektu: krótkie notatki o kodzie, od których modele zaczynają">Mapa</button>
   <button id="newchat" class="iconbtn" title="Nowa rozmowa (zapisuje stan do pamięci projektu)" aria-label="Nowa rozmowa">📄</button>
   <button id="aboutbtn" class="iconbtn" title="O programie i aktualizacje" aria-label="O programie">?<span id="newdot" hidden></span></button>
 </header>
@@ -205,6 +212,7 @@ dialog input.rolepick{width:340px}
     <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem wybrany model wdraża ustalenia, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić.</p>
     <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
     <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
+    <p><b>Mapa</b> (na górze) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
     <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
     <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu oraz plany i limity kont. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
   </div>
@@ -225,6 +233,20 @@ dialog input.rolepick{width:340px}
   <small id="debnote">Debata działa tylko do odczytu. Wdraża wybrany model po ostatniej rundzie, ze swoimi uprawnieniami. Sprawdzający kończą werdyktem: akceptuję, uwagi albo nie mogę sprawdzić. Przy uwagach wdrażający poprawia, najwyżej tyle razy, ile rund poprawek. Każda tura zużywa limit danego modelu.</small>
   <menu style="gap:8px"><button id="debcancel" type="button">Anuluj</button><button id="debgo" type="button">Rozpocznij</button></menu>
 </dialog>
+<dialog id="mapdlg">
+  <h3>Mapa projektu</h3>
+  <div id="mapstate" role="status"></div>
+  <button id="maprefresh" type="button">Odśwież teraz</button> <button id="mapopen" type="button">Otwórz folder mapy</button>
+  <div id="mapindex"></div>
+  <fieldset><legend>Ostatnie zmiany modeli (ZMIANY.md)</legend><div id="maplog"></div></fieldset>
+  <fieldset><legend>Wspólne zasady</legend>
+    <button id="startfiles" type="button">Pliki startowe</button>
+    <div id="startstate"></div>
+    <small>Tworzy brakujące CLAUDE.md, AGENTS.md i GEMINI.md z odsyłaczem do REGULY.md i do mapy. Istniejących plików nie zmienia. REGULY.md piszesz sam: zasady wspólne dla wszystkich modeli.</small>
+  </fieldset>
+  <small>Mapa leży w <code>.trybunai/mapa</code>: INDEX.md z listą plików i notatka dla każdego modułu Pythona (publiczne funkcje i klasy, kto od kogo zależy). Nowa sesja modelu dostaje tylko wskazówkę, żeby od niej zacząć, oraz ostatnie zmiany; trwająca sesja dostaje zmiany innych modeli. Folder otworzysz jako vault w Obsidianie (graf). Sekcje „Uwagi (ręczne)” możesz uzupełniać: generator ich nie nadpisuje.</small>
+  <menu><button id="mapclose" type="button">Zamknij</button></menu>
+</dialog>
 <dialog id="dlg"><form method="dialog">
   <h3>Ustawienia</h3>
   <label>Prompter używa <select id="engine"></select></label>
@@ -237,6 +259,11 @@ dialog input.rolepick{width:340px}
     <button id="savestate" type="button">Zapisz stan teraz</button> <span id="savestateerr" class="err"></span>
     <label style="justify-content:flex-start"><input id="autofresh" type="checkbox"> Świeża sesja automatycznie, gdy kontekst modelu przekroczy 150 tys. tokenów</label>
     <small>Nowa sesja modelu (także po „Nowa rozmowa”) dostaje tę pamięć zamiast całej historii. Aktualizuje ją model wybrany jako Prompter, na podstawie czatu: przy świeżej sesji, przy nowej rozmowie i po kliknięciu „Zapisz stan teraz” (np. przed przejściem na inny komputer). Sekcję „Nie ruszać” modele traktują jak twarde zasady. Możesz ją tu poprawić.</small>
+  </fieldset>
+  <fieldset id="mapbox"><legend>Mapa projektu</legend>
+    <label style="justify-content:flex-start"><input id="mapon" type="checkbox"> Prowadź mapę projektu i dziennik zmian</label>
+    <label>Pomijaj katalogi <input id="mapexclude" type="text" placeholder="np. obiekty, dane/klienci"></label>
+    <small>Katalogi z danymi (oddzielone przecinkami) nie trafią do mapy ani do dziennika zmian. Zawsze pomijane są .git, .venv, node_modules, dist, build i foldery zaczynające się od kropki.</small>
   </fieldset>
   <fieldset id="limitsbox"><legend>Plany i limity</legend>
     <div id="limits" role="status"></div>
@@ -625,6 +652,23 @@ async function checkUpdate() {
   $("aboutbtn").title = fresh ? `Jest nowa wersja ${release.version}: kliknij, aby zaktualizować` : "O programie i aktualizacje";
   if ($("aboutdlg").open) drawUpdate();
 }
+async function showMap(refresh) {
+  const st = $("mapstate");
+  if (S.settings.map === false && !refresh) st.textContent = "Mapa jest wyłączona w Ustawieniach. „Odśwież teraz” i tak ją wygeneruje.";
+  if (refresh) {
+    st.textContent = "Generuję…"; $("maprefresh").disabled = true;
+    const r = await api.refresh_map();
+    $("maprefresh").disabled = false;
+    st.textContent = r.ok ? `Gotowe: ${r.modules} modułów, ${r.files} plików, przeczytane ponownie: ${r.parsed}, zapisane notatki: ${r.written}.` : "Błąd: " + r.error;
+  }
+  const info = await api.map_info();
+  if (!info.index && !refresh) st.textContent = "Mapy jeszcze nie ma. Powstanie przy pierwszej sesji modelu albo po kliknięciu „Odśwież teraz”.";
+  else if (!refresh && info.enabled) st.textContent = info.folder;
+  $("mapindex").textContent = info.index;
+  $("maplog").replaceChildren(...(info.log.length ? info.log.slice().reverse() : ["Brak wpisów."]).map(t => {
+    const d = document.createElement("div"); d.textContent = t; return d; }));
+}
+
 async function openAbout() {
   about = about || await api.about();
   $("aboutver").textContent = about.version; $("aboutauthor").textContent = about.author;
@@ -845,6 +889,8 @@ window.addEventListener("pywebviewready", async () => {
   };
   $("settings").onclick = async () => {
     fillSettings(); $("autofresh").checked = S.settings.auto_fresh !== false;
+    $("mapon").checked = S.settings.map !== false;
+    $("mapexclude").value = (S.settings.map_exclude || ["obiekty"]).join(", ");
     const mem = $("memory"); mem.dataset.loaded = "0"; mem.value = "";
     $("dlg").showModal(); drawLimits(); loadModelLists(false);
     mem.value = await api.get_memory(); mem.dataset.original = mem.value; mem.dataset.loaded = "1";
@@ -852,6 +898,17 @@ window.addEventListener("pywebviewready", async () => {
   $("limitsrefresh").onclick = drawLimits;
   $("modelsrefresh").onclick = () => loadModelLists(true);
   $("aboutbtn").onclick = openAbout;
+  $("mapbtn").onclick = () => { $("startstate").textContent = ""; $("mapdlg").showModal(); showMap(false); };
+  $("maprefresh").onclick = () => showMap(true);
+  $("mapopen").onclick = () => api.open_map_folder();
+  $("mapclose").onclick = () => $("mapdlg").close();
+  $("startfiles").onclick = async () => {
+    const r = await api.start_files(), out = [];
+    if (r.created.length) out.push("Utworzono: " + r.created.join(", "));
+    if (r.existing.length) out.push("Już były (bez zmian): " + r.existing.join(", "));
+    if (r.rules_missing) out.push("Brak REGULY.md: utwórz go w folderze projektu i wpisz wspólne zasady.");
+    $("startstate").textContent = out.join("\n"); $("startstate").style.whiteSpace = "pre-wrap";
+  };
   $("aboutclose").onclick = () => $("aboutdlg").close();
   $("updcheck").onclick = checkUpdate;
   $("updgo").onclick = installUpdate;
@@ -876,7 +933,8 @@ window.addEventListener("pywebviewready", async () => {
     const models = chosenModels();
     const everyone = [...document.querySelectorAll("#everyone input:checked")].map(c => c.dataset.agent);
     const changes = {prompter: $("engine").value, models, everyone, auto_fresh: $("autofresh").checked,
-                     roles: chosenRoles()};
+                     roles: chosenRoles(), map: $("mapon").checked,
+                     map_exclude: $("mapexclude").value.split(",").map(x => x.trim()).filter(Boolean)};
     const r = await api.update_settings(changes);
     if (r.ok) Object.assign(S.settings, changes); else toast(r.error);
     if ($("memory").dataset.loaded === "1" && $("memory").value !== $("memory").dataset.original)
