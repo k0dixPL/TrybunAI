@@ -42,6 +42,8 @@ ol.steps li{margin:10px 0}
 code{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:14px}
 .note{max-width:720px;margin:18px auto 0;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--haiku);
 border-radius:10px;padding:12px 16px;color:var(--dim);font-size:15px}
+#komentarze .lead{color:var(--dim);text-align:center;margin:-6px 0 18px}
+.giscus{max-width:820px;margin:0 auto}
 footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;border-top:1px solid var(--line);margin-top:20px}
 @media (max-width:600px){header nav{display:none}.hero p{font-size:16px}}
 </style>
@@ -51,7 +53,7 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
   <header>
     <img src="logo.png" alt="">
     <b>TrybunAI</b>
-    <nav><a href="#funkcje">Funkcje</a><a href="#start">Jak zacząć</a><a href="https://github.com/k0dixPL/TrybunAI">GitHub</a></nav>
+    <nav><a href="#funkcje">Funkcje</a><a href="#start">Jak zacząć</a><a href="#komentarze">Komentarze</a><a href="https://github.com/k0dixPL/TrybunAI">GitHub</a></nav>
   </header>
 
   <div class="hero">
@@ -86,6 +88,20 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
       <li><b>Pisz.</b> Historia rozmowy i pamięć projektu zapisują się w folderze <code>.trybunai</code> obok exe.</li>
     </ol>
     <div class="note">Potrzebujesz własnych kont: Claude (np. plan Pro), ChatGPT dla Codexa i konta Google dla Antigravity. Wystarczy jedno z nich. Plik nie jest podpisany cyfrowo, więc Windows może pokazać ostrzeżenie SmartScreen: kliknij <b>Więcej informacji → Uruchom mimo to</b>.</div>
+  </section>
+
+  <section id="komentarze">
+    <h2>Komentarze</h2>
+    <p class="lead">Pytania, pomysły, wrażenia z używania. Wystarczy konto GitHub; wpisy trafiają do
+      <a href="https://github.com/k0dixPL/TrybunAI/discussions">Dyskusji</a> projektu.
+      Jeśli TrybunAI Ci się przydaje, zostaw też <a href="https://github.com/k0dixPL/TrybunAI">⭐ na GitHubie</a>.</p>
+    <script src="https://giscus.app/client.js"
+      data-repo="k0dixPL/TrybunAI" data-repo-id="R_kgDOVgfhpg"
+      data-category="General" data-category-id="DIC_kwDOVgfhps4DKr9z"
+      data-mapping="specific" data-term="Strona TrybunAI" data-strict="1"
+      data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top"
+      data-theme="preferred_color_scheme" data-lang="pl" data-loading="lazy"
+      crossorigin="anonymous" async></script>
   </section>
 
   <footer>
