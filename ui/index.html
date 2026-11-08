@@ -114,6 +114,19 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 #modelsrefresh{font-size:12.5px;margin:2px 0}
 dialog label.rolerow{margin:-4px 0 12px;color:var(--dim);font-size:13px}
 dialog input.rolepick{width:340px}
+#aboutdlg{width:560px;max-height:90vh}
+#aboutdlg .abouthead{display:flex;gap:14px;align-items:center;margin-bottom:6px}
+#aboutdlg .abouthead h3{margin:0 0 3px}#aboutdlg .dim{color:var(--dim);font-size:13px}
+#aboutdlg a{color:var(--gemini)}
+#aboutdlg .help{font-size:13.5px;line-height:1.5}#aboutdlg .help h4{margin:12px 0 4px}
+#aboutdlg .help p{margin:5px 0}
+#updstate{margin:3px 0 6px}#updstate.new{color:var(--codex);font-weight:600}
+#updnotes{white-space:pre-wrap;font-size:12.5px;color:var(--dim);max-height:130px;overflow-y:auto;margin-bottom:7px}
+#updnotes:empty{display:none}
+#updgo{background:#3d6fd1;border-color:#3d6fd1;color:#fff}
+.iconbtn{min-width:36px;padding-left:9px;padding-right:9px;font-size:16px;line-height:1.2;position:relative}
+#aboutbtn{font-weight:700}
+#newdot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--codex)}
 #memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:12.5px;margin-top:4px}
 #limits .acct{margin:8px 0 10px}
 #limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
@@ -137,7 +150,8 @@ dialog input.rolepick{width:340px}
   <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
   <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
-  <button id="newchat">Nowa rozmowa</button>
+  <button id="newchat" class="iconbtn" title="Nowa rozmowa (zapisuje stan do pamięci projektu)" aria-label="Nowa rozmowa">📄</button>
+  <button id="aboutbtn" class="iconbtn" title="O programie i aktualizacje" aria-label="O programie">?<span id="newdot" hidden></span></button>
 </header>
 <div id="toast" role="alert"></div>
 <main id="log"><div class="wrap" id="items"></div></main>
@@ -174,6 +188,27 @@ dialog input.rolepick{width:340px}
   <div id="remoteerr" class="err"></div>
   <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex, Antigravity i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
   <menu style="gap:8px"><button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button><button id="remoteclose" type="button">Zamknij</button><button id="remotetoggle" type="button"></button></menu>
+</dialog>
+<dialog id="aboutdlg">
+  <div class="abouthead"><img class="logo" alt="" width="54" height="54"><div><h3>TrybunAI <span id="aboutver"></span></h3>
+    <div class="dim">Autor: <b id="aboutauthor"></b> · licencja MIT · <a href="#" data-href="repo">GitHub</a> · <a href="#" data-href="page">strona</a></div></div></div>
+  <fieldset><legend>Aktualizacje</legend>
+    <div id="updstate" role="status">Sprawdzam…</div>
+    <div id="updnotes"></div>
+    <button id="updcheck" type="button">Sprawdź ponownie</button> <button id="updgo" type="button" hidden></button>
+  </fieldset>
+  <div class="help">
+    <h4>Jak to działa</h4>
+    <p><b>Folder projektu.</b> Modele pracują w folderze, w którym leży exe (zmienisz go, klikając ścieżkę na górze). Historia czatu i pamięć projektu są w <code>.trybunai</code>.</p>
+    <p><b>Czat.</b> Przyciski modeli na dole wybierają, kto odpowiada. Możesz też zacząć od <code>@claude</code>, <code>@codex</code>, <code>@agy</code>, <code>@haiku</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p>
+    <p><b>Uprawnienia</b> (obok modeli) dotyczą wybranego modelu: tylko odczyt, edycja plików albo pełny dostęp. Gdy model chce więcej, pod odpowiedzią pojawia się kartka z przyciskiem jednorazowej zgody.</p>
+    <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem wybrany model wdraża ustalenia, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić.</p>
+    <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
+    <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
+    <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
+    <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu oraz plany i limity kont. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
+  </div>
+  <menu><button id="aboutclose" type="button">Zamknij</button></menu>
 </dialog>
 <dialog id="debdlg">
   <h3>Debata modeli</h3>
@@ -569,6 +604,43 @@ async function startDebate() {
   if (r.warn) toast(r.warn);
 }
 
+// ---- about & updates ----
+let about = null, release = null;
+function drawUpdate() {
+  const st = $("updstate"), go = $("updgo");
+  st.className = ""; go.hidden = true; $("updnotes").textContent = "";
+  if (!release) { st.textContent = "Sprawdzam…"; return; }
+  if (!release.ok) { st.textContent = release.error; return; }
+  if (!release.newer) { st.textContent = `Masz najnowszą wersję (${about.version}).`; return; }
+  st.className = "new"; st.textContent = `Jest nowsza wersja: ${release.version} (masz ${about.version}).`;
+  $("updnotes").textContent = release.notes || "";
+  go.hidden = false;
+  go.textContent = about.frozen ? `Zaktualizuj do ${release.version} i uruchom ponownie` : "Otwórz stronę wydania";
+}
+async function checkUpdate() {
+  release = null; drawUpdate(); $("updcheck").disabled = true;
+  try { release = await api.check_update(); } finally { $("updcheck").disabled = false; }
+  const fresh = !!(release && release.ok && release.newer);
+  $("newdot").hidden = !fresh;
+  $("aboutbtn").title = fresh ? `Jest nowa wersja ${release.version}: kliknij, aby zaktualizować` : "O programie i aktualizacje";
+  if ($("aboutdlg").open) drawUpdate();
+}
+async function openAbout() {
+  about = about || await api.about();
+  $("aboutver").textContent = about.version; $("aboutauthor").textContent = about.author;
+  $("aboutdlg").querySelector(".logo").src = logoData;
+  $("aboutdlg").showModal();
+  if (release) drawUpdate(); else checkUpdate();
+}
+async function installUpdate() {
+  if (!about.frozen) return api.open_link(release.page);
+  if (!confirm(`Pobrać TrybunAI ${release.version}, podmienić ten plik exe i uruchomić program ponownie?`)) return;
+  const go = $("updgo"); go.disabled = true; go.textContent = "Pobieram i sprawdzam…";
+  const r = await api.install_update();
+  if (r.ok) { $("updstate").textContent = `Zainstalowano ${r.version}. Uruchamiam ponownie…`; return; }
+  go.disabled = false; drawUpdate(); $("updstate").textContent = r.error;
+}
+
 async function refine() {
   const text = $("input").value;
   original = text;
@@ -748,9 +820,9 @@ window.addEventListener("pywebviewready", async () => {
   };
   $("newchat").onclick = async () => {
     if (!confirm("Zacząć nową rozmowę? Ustalenia trafią do pamięci projektu, a rozmowa do archiwum w folderze .trybunai.")) return;
-    const b = $("newchat"); b.disabled = true; b.textContent = "Zapisuję stan…";
+    const b = $("newchat"); b.disabled = true; b.textContent = "⏳"; b.title = "Zapisuję stan do pamięci projektu…";
     const r = await api.new_chat();
-    b.disabled = false; b.textContent = "Nowa rozmowa";
+    b.disabled = false; b.textContent = "📄"; b.title = "Nowa rozmowa (zapisuje stan do pamięci projektu)";
     if (!r.ok) return toast(r.error);
     await reload();
     if (r.warn) toast(r.warn);
@@ -779,6 +851,11 @@ window.addEventListener("pywebviewready", async () => {
   };
   $("limitsrefresh").onclick = drawLimits;
   $("modelsrefresh").onclick = () => loadModelLists(true);
+  $("aboutbtn").onclick = openAbout;
+  $("aboutclose").onclick = () => $("aboutdlg").close();
+  $("updcheck").onclick = checkUpdate;
+  $("updgo").onclick = installUpdate;
+  $("aboutdlg").querySelectorAll("a[data-href]").forEach(a => a.onclick = e => { e.preventDefault(); api.open_link(about[a.dataset.href]); });
   $("savestate").onclick = async () => {
     const b = $("savestate"), mem = $("memory");
     if (mem.value !== mem.dataset.original) await api.set_memory(mem.value);  // keep a manual edit as the base
@@ -819,6 +896,7 @@ window.addEventListener("pywebviewready", async () => {
   setPrompter(false, null);
   await reload();
   $("input").focus();
+  setTimeout(() => api.about().then(a => { about = a; checkUpdate(); }), 3000);  // quiet check; offline is fine
   // A new laptop: show what is missing straight away.
   if (Object.values(S.agents).some(a => !a.available && !a.optional)) $("setupbtn").click();
 });

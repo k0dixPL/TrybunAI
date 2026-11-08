@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from trybun import core, limits, models, setup  # noqa: E402
+from trybun import core, limits, models, setup, update  # noqa: E402
 from trybun.agents import (build_command, build_remote_command, parse_event, session_name,  # noqa: E402
                            stdin_payload)
 from trybun.remote import RemoteControl  # noqa: E402
@@ -206,6 +206,38 @@ class Pure(unittest.TestCase):
                 Session._apply(session, kind, value, result, "r")
         self.assertEqual(result.usage(), {"model": "claude-sonnet-5", "context": 438002, "calls": 1},
                          "one call split over two events counts once")
+
+    def test_update_check_and_safe_swap(self):
+        import hashlib, io
+        new_exe = b"MZ nowy program"
+        good = hashlib.sha256(new_exe).hexdigest()
+        def release(sha):
+            return {"tag_name": "v1.0.20", "body": "- zmiana\n\n**Pobierz:** plik", "html_url": "https://x/rel",
+                    "assets": [{"name": "TrybunAI.exe", "browser_download_url": "https://x/TrybunAI.exe",
+                                "size": len(new_exe), "digest": f"sha256:{sha}"}]}
+        class Opener:
+            def __init__(self, sha): self.sha = sha
+            def __call__(self, request, timeout=None):
+                body = json.dumps(release(self.sha)).encode() if "api.github" in request.full_url else new_exe
+                return io.BytesIO(body)
+        self.assertGreater(update.parse_version("v1.0.10"), update.parse_version("1.0.9"), "numbers, not text")
+        info = update.check("1.0.11", opener=Opener(good))
+        self.assertTrue(info["ok"] and info["newer"])
+        self.assertEqual((info["version"], info["notes"]), ("1.0.20", "- zmiana"))
+        self.assertFalse(update.check("1.0.20", opener=Opener(good))["newer"])
+        def broken(request, timeout=None): raise OSError("offline")
+        self.assertFalse(update.check("1.0.11", opener=broken)["ok"])
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp, "TrybunAI.exe"); exe.write_bytes(b"MZ stary")
+            bad = update.install(update.check("1.0.11", opener=Opener("0" * 64)), exe, opener=Opener("0" * 64))
+            self.assertFalse(bad["ok"])
+            self.assertEqual(exe.read_bytes(), b"MZ stary", "a wrong checksum changes nothing")
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["TrybunAI.exe"])
+            self.assertTrue(update.install(update.check("1.0.11", opener=Opener(good)), exe, opener=Opener(good))["ok"])
+            self.assertEqual(exe.read_bytes(), new_exe)
+            self.assertEqual(Path(tmp, "TrybunAI.old.exe").read_bytes(), b"MZ stary")
+            update.cleanup(exe)
+            self.assertFalse(Path(tmp, "TrybunAI.old.exe").exists())
 
     def test_verdicts_and_denials_are_read_from_output(self):
         self.assertEqual(core.parse_verdict("ok\n**WERDYKT: AKCEPTUJĘ**"), "accept")

@@ -1,5 +1,13 @@
 # Zmiany
 
+## 1.0.12 — 2026-11-08
+- „O programie” (link na dole): wersja, autor, licencja MIT, linki do GitHuba i strony oraz opis
+  wszystkich elementów programu.
+- Aktualizacje z poziomu programu: sprawdzanie najnowszego wydania na GitHubie (też po cichu przy starcie,
+  z dopiskiem „nowa wersja” przy linku) i aktualizacja jednym przyciskiem: pobranie exe, weryfikacja
+  sumy SHA-256 z GitHuba, podmiana pliku i ponowne uruchomienie. Stary exe zostaje jako kopia i znika
+  przy następnym starcie. Aktualizowana jest uruchomiona kopia programu.
+
 ## 1.0.11 — 2026-11-08
 - Sprawdzanie po debacie kończy się werdyktem: AKCEPTUJĘ, UWAGI albo NIE MOGĘ SPRAWDZIĆ (plakietka przy
   odpowiedzi). Brak werdyktu nigdy nie liczy się jako akceptacja. Przy uwagach wdrażający poprawia

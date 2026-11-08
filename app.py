@@ -5,6 +5,7 @@ import base64
 import json
 import os
 import queue
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -12,8 +13,10 @@ from pathlib import Path
 
 import webview
 
-from trybun import __version__
+from trybun import __version__, update
 from trybun.core import Session
+
+AUTHOR = "k0dixPL"
 
 
 def window_title(project_name):
@@ -97,6 +100,35 @@ class Api:
     def save_state(self):
         return self._session.save_state()
 
+    def about(self):
+        return {"version": __version__, "author": AUTHOR, "repo": f"https://github.com/{update.REPO}",
+                "page": update.PAGE, "frozen": bool(getattr(sys, "frozen", False))}
+
+    def check_update(self):
+        return update.check(__version__)
+
+    def install_update(self):
+        """Swap this exe for the newest release and start it; only the running copy is updated."""
+        if not getattr(sys, "frozen", False):
+            return {"ok": False, "error": "Aktualizacja działa tylko w pliku exe. Tu użyj git pull."}
+        if self._session._busy:
+            return {"ok": False, "error": "Najpierw poczekaj, aż modele skończą pracę."}
+        info = update.check(__version__)
+        if not info["ok"]:
+            return info
+        if not info["newer"]:
+            return {"ok": False, "error": "Masz już najnowszą wersję."}
+        result = update.install(info, sys.executable)
+        if not result["ok"]:
+            return result
+        # A fresh PyInstaller process must not inherit this one's unpacked temp folder.
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("_MEI", "_PYI"))}
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        subprocess.Popen([sys.executable], cwd=str(base_dir()), env=env,
+                         creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+        threading.Timer(0.5, self._window.destroy).start()
+        return {"ok": True, "version": info["version"]}
+
     def retry_with(self, agent, mode):
         return self._session.retry_with(agent, mode)
 
@@ -154,6 +186,8 @@ class Api:
 
 
 def main():
+    if getattr(sys, "frozen", False):
+        update.cleanup(sys.executable)  # the exe replaced by the last update
     bridge = Bridge()
     session = Session(base_dir(), bridge.emit)
     api = Api(session)
