@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.0.14 — 2026-11-08
+- Mapa projektu: przy każdej sygnaturze numer linii (`# L120`), więc model czyta od razu właściwy fragment.
+- Pliki od 800 linii dostają sekcję „Mapa pliku” ze wszystkimi funkcjami i metodami, także prywatnymi
+  (bez dunderów poza `__init__`), pogrupowanymi po klasach, najwyżej 150 pozycji.
+- Opis modułu pomija linie z samą nazwą pliku lub numerem wersji („v2.0”, „v4.0 (przepisane od zera)”)
+  i bierze następną sensowną linię docstringu.
+- Moduł powyżej 5000 linii bez funkcji i klas (np. dane base64) jest oznaczony w INDEX jako „(dane)”.
+- Poprawka: odświeżanie mapy po turze startuje, zanim model zostanie oznaczony jako wolny
+  (wcześniej rzadko ścigało się z zamykaniem programu).
+
 ## 1.0.13 — 2026-11-08
 - Mapa projektu (`.trybunai/mapa`, przycisk „Mapa” na górze): INDEX.md z listą plików i notatka dla każdego
   modułu Pythona (pierwsza linia opisu, publiczne sygnatury, „Zależy od” / „Używany przez” z importów).

@@ -720,13 +720,13 @@ class Session:
             # A huge session makes every later step expensive: hand over to the memory instead.
             refresh = (not keep_busy and status == "ok" and self._too_big(agent)
                        and self.settings.get("auto_fresh", True))
+            if logged:  # notes of the changed modules, off the UI thread; started before "not busy"
+                worker = threading.Thread(target=self.refresh_map, daemon=True)
+                worker.start()
+                self._map_workers = [w for w in self._map_workers if w.is_alive()] + [worker]
             if not keep_busy and not refresh:
                 self._busy.discard(agent)
         self.emit({"t": "end", "id": run_id, "agent": agent, "message": msg})
-        if logged:  # notes of the changed modules, off the UI thread
-            worker = threading.Thread(target=self.refresh_map, daemon=True)
-            self._map_workers.append(worker)
-            worker.start()
         if refresh:  # the agent stays busy until its session is replaced
             threading.Thread(target=self._refresh_sessions, args=([agent], True), daemon=True).start()
         return status
@@ -1144,7 +1144,9 @@ class Session:
             procs = list(self._procs.values())
         for proc in procs:
             self._kill(proc)
-        for worker in self._map_workers:  # a map write must not race the folder going away
+        with self._lock:
+            workers = list(self._map_workers)
+        for worker in workers:  # a map write must not race the folder going away
             worker.join(timeout=10)
 
 

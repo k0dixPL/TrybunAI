@@ -21,6 +21,10 @@ STATE = ".stan.json"
 LOG_KEEP = 30
 DEFAULT_EXCLUDE = ["obiekty"]
 MAX_SIGNATURES = 40
+BIG_FILE = 800          # lines; such a file also gets a "Mapa pliku" with private functions
+OUTLINE_LIMIT = 150     # entries in that outline
+DATA_LINES = 5_000      # a longer .py without any def or class is data (e.g. base64), not code
+FORMAT = 2              # bump when read_module() output changes, so the cache is rebuilt
 INDEX_TARGET = 150
 MAX_FILES = 50_000
 MANUAL_START, MANUAL_END = "<!-- reczne -->", "<!-- /reczne -->"
@@ -91,30 +95,51 @@ def _args(args):
 def _function(node, indent=""):
     prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
     ret = f" -> {ast.unparse(node.returns)}" if node.returns else ""
-    return scrub(f"{indent}{prefix} {node.name}({_args(node.args)}){ret}")
+    return scrub(f"{indent}{prefix} {node.name}({_args(node.args)}){ret}  # L{node.lineno}")
 
 
-def _first_line(node):
+def _doc_lines(node, keep=6):
+    """The first few non-empty docstring lines; clean_doc() picks the first one that says something."""
     doc = ast.get_docstring(node) or ""
-    return scrub(doc.strip().splitlines()[0].strip()) if doc.strip() else ""
+    return [scrub(line.strip())[:300] for line in doc.splitlines() if line.strip()][:keep]
+
+
+_FUNCS = (ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _outline(tree):
+    """[class name or "", line, function name] for every function and method, private ones too.
+    Dunders are left out, except a class's __init__. A row with an empty name is the class itself."""
+    out = []
+    for node in tree.body:
+        if isinstance(node, _FUNCS) and not node.name.startswith("__"):
+            out.append(["", node.lineno, node.name])
+        elif isinstance(node, ast.ClassDef):
+            out.append([node.name, node.lineno, ""])
+            for item in node.body:
+                if isinstance(item, _FUNCS) and (not item.name.startswith("__") or item.name == "__init__"):
+                    out.append([node.name, item.lineno, item.name])
+    return out
 
 
 def read_module(path):
     """Docstring, public signatures and raw imports of one file; None fields when it does not parse."""
     text = Path(path).read_text(encoding="utf-8", errors="replace")
-    info = {"lines": text.count("\n") + 1, "doc": "", "signatures": [], "imports": [], "error": None}
+    info = {"lines": text.count("\n") + 1, "doc": "", "signatures": [], "imports": [], "error": None,
+            "outline": [], "data": False}
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
         info["error"] = f"błąd składni w linii {exc.lineno}"
         return info
-    info["doc"] = _first_line(tree)
+    info["doc"] = "\n".join(_doc_lines(tree))
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
             info["signatures"].append(_function(node))
         elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
             bases = ", ".join(ast.unparse(b) for b in node.bases)
-            info["signatures"].append(scrub(f"class {node.name}" + (f"({bases})" if bases else "")))
+            info["signatures"].append(scrub(f"class {node.name}" + (f"({bases})" if bases else "")
+                                            + f"  # L{node.lineno}"))
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and not item.name.startswith("_"):
                     info["signatures"].append(_function(item, "    "))
@@ -123,6 +148,10 @@ def read_module(path):
             info["imports"].extend([0, a.name, []] for a in node.names)
         elif isinstance(node, ast.ImportFrom):
             info["imports"].append([node.level, node.module or "", [a.name for a in node.names]])
+    has_code = any(isinstance(n, (*_FUNCS, ast.ClassDef)) for n in ast.walk(tree))
+    info["data"] = info["lines"] > DATA_LINES and not has_code
+    if info["lines"] >= BIG_FILE:
+        info["outline"] = _outline(tree)
     return info
 
 
@@ -193,14 +222,35 @@ def _write_if_changed(path, text):
     return False
 
 
+_VERSION_ONLY = re.compile(r"(?i)^v?\d+(\.\d+)+[a-z]?\s*(\(.*\))?\s*[.:]?$")
+
+
 def clean_doc(rel, doc):
-    """Drop a leading file name ("core/history.py - ...") that only repeats the path."""
-    parts = rel.split("/")
-    for i in range(len(parts)):
-        tail = "/".join(parts[i:])
-        if doc.lower().startswith(tail.lower()):
-            return doc[len(tail):].lstrip(" -–—:").strip()
-    return doc
+    """The first docstring line that says something: a leading file name ("core/history.py - ...")
+    is dropped, and so is a line that is only a version ("v2.0", "v4.0 (przepisane od zera)")."""
+    # Any path ending in this file's name: the docstring may use a different root than the project.
+    path = re.compile(r"^[\w./\\-]*?" + re.escape(rel.rpartition("/")[2]) + r"(?![\w.])", re.I)
+    for line in (doc or "").splitlines():
+        line = path.sub("", line.strip(), count=1).lstrip(" -–—:").strip()
+        if line and not _VERSION_ONLY.match(line) and not set(line) <= set("-=*#~_ "):
+            return line
+    return ""
+
+
+def _outline_lines(outline):
+    lines, shown = [], 0
+    for cls, line, name in outline:
+        if shown >= OUTLINE_LIMIT:
+            break
+        if not name:
+            lines += ["", f"class {cls}  # L{line}"]
+            continue
+        lines.append(f"{'    ' if cls else ''}L{line} {name}")
+        shown += 1
+    rest = sum(1 for _, _, n in outline if n) - shown
+    if rest > 0:
+        lines.append(f"(+{rest} więcej)")
+    return lines[1:] if lines and lines[0] == "" else lines
 
 
 def _links(names):
@@ -221,6 +271,11 @@ def module_note(name, rel, info, depends, used_by, old_text=""):
         if len(sigs) > MAX_SIGNATURES:
             lines.append(f"(+{len(sigs) - MAX_SIGNATURES} więcej)")
         lines.append("")
+    if info.get("data"):
+        lines += ["Plik z danymi (bez funkcji i klas): nie czytaj go w całości.", ""]
+    if info.get("outline"):
+        lines += ["## Mapa pliku", "", "Wszystkie funkcje i metody (także prywatne), z linią początkową.",
+                  "", "```", *_outline_lines(info["outline"]), "```", ""]
     lines += ["## Uwagi (ręczne: przeznaczenie, pułapki; generator ich nie zmienia)", "",
               _manual_block(old_text), ""]
     return "\n".join(lines)
@@ -259,7 +314,8 @@ def index_note(project_name, modules, others, old_text=""):
         if kind == "py":
             doc = clean_doc(rel, data["doc"])
             note = f" — {doc}" if doc else ""
-            body.append(f"- [[{name}]]{note} ({data['lines']} l.)")
+            kind_note = "dane, " if data.get("data") else ""
+            body.append(f"- [[{name}]]{note} ({kind_note}{data['lines']} l.)")
         else:
             body.append(f"- `{rel}` ({_size(data)})")
     if grouped:
@@ -313,7 +369,8 @@ def generate(project, skip_dirs=(), exclude=DEFAULT_EXCLUDE):
     folder = map_dir(project)
     folder.mkdir(parents=True, exist_ok=True)
     state = _load_state(folder)
-    cached = state.get("files", {}) if state.get("exclude") == list(exclude) else {}
+    same = state.get("exclude") == list(exclude) and state.get("format") == FORMAT
+    cached = state.get("files", {}) if same else {}
     current = _walk(project, set(skip_dirs), exclude)
     files, parsed = {}, 0
     for rel, (mtime, size) in current.items():
@@ -360,7 +417,7 @@ def generate(project, skip_dirs=(), exclude=DEFAULT_EXCLUDE):
                        sorted((rel, e["size"]) for rel, e in files.items() if not rel.endswith(".py")),
                        _read(folder / INDEX))
     written += _write_if_changed(folder / INDEX, index)
-    (folder / STATE).write_text(json.dumps({"exclude": list(exclude), "files": files}, ensure_ascii=False),
+    (folder / STATE).write_text(json.dumps({"format": FORMAT, "exclude": list(exclude), "files": files}, ensure_ascii=False),
                                 encoding="utf-8")
     return {"modules": len(modules), "files": len(files), "parsed": parsed, "written": written}
 

@@ -804,7 +804,9 @@ class ProjectMap(unittest.TestCase):
         self.assertFalse((self.folder / "obiekty.klient_kowalski.md").exists())
         baza = (self.folder / "pkg.baza.md").read_text(encoding="utf-8")
         self.assertIn("def polacz(host=…, port=22, haslo=…, *, timeout=5)", baza)
-        self.assertIn("class Klient\n    def wyslij(self, dane)", baza)
+        self.assertIn("def polacz(host=…, port=22, haslo=…, *, timeout=5)  # L3", baza)
+        self.assertIn("class Klient  # L7\n    def wyslij(self, dane)  # L8", baza)
+        self.assertNotIn("## Mapa pliku", baza, "a small file shows only the public part")
         for leak in ("192.168", "10.0.0.5", "tajne123", "_ukryta", "_wew"):
             self.assertNotIn(leak, baza)
         self.assertIn("Używany przez: [[pkg.zakladka]]", baza)
@@ -839,6 +841,44 @@ class ProjectMap(unittest.TestCase):
         self.assertIn("[[obiekty.klient_kowalski]]", index)
         self.assertNotIn("app.js", index)
         self.assertNotIn("[[pkg.zakladka]]", index)
+
+    def test_big_file_gets_full_outline_with_private_methods(self):
+        body = "".join(f"    def _m{i}(self):\n        pass\n" for i in range(200))
+        (self.dir / "pkg" / "duza.py").write_text(
+            '"""v2.0\n\nZakładka z tabelą obiektów."""\n'
+            "def _pomocnik():\n    pass\n"
+            "class Tabela:\n    def __init__(self): pass\n    def __repr__(self): pass\n"
+            "    def load(self): pass\n" + body + "\n" * 400, encoding="utf-8")
+        self.generate()
+        note = (self.folder / "pkg.duza.md").read_text(encoding="utf-8")
+        outline = note.split("## Mapa pliku", 1)[1]
+        self.assertIn("L4 _pomocnik", outline)
+        self.assertIn("class Tabela  # L6", outline)
+        self.assertIn("    L7 __init__", outline)
+        self.assertNotIn("__repr__", outline)
+        self.assertIn("    L9 load", outline)
+        self.assertIn("    L10 _m0", outline)
+        self.assertIn("(+53 więcej)", outline, "1 function + __init__ + load + 200 methods, 150 shown")
+        self.assertIn("def load(self)  # L9", note.split("## Mapa pliku")[0])
+        index = (self.folder / "INDEX.md").read_text(encoding="utf-8")
+        self.assertIn("[[pkg.duza]] — Zakładka z tabelą obiektów.", index)
+
+    def test_version_only_docstrings_are_skipped(self):
+        self.assertEqual(mapa.clean_doc("modules/tab_table.py", "modules/tab_table.py - v1.1"), "")
+        self.assertEqual(mapa.clean_doc("m/tab_batch.py", "modules/tab_batch.py - v4.0 (przepisane od zera)\n"
+                                        "Masowe operacje na kamerach."), "Masowe operacje na kamerach.")
+        self.assertEqual(mapa.clean_doc("a.py", "v2.0\n====\nOpis."), "Opis.")
+        self.assertEqual(mapa.clean_doc("a.py", "Wersja v2.0 dodała eksport."), "Wersja v2.0 dodała eksport.")
+        self.assertEqual(mapa.clean_doc("core/history.py", "core/history.py"), "")
+
+    def test_huge_module_without_code_is_data(self):
+        (self.dir / "pkg" / "_intro.py").write_text(
+            '"""Animacja zakodowana base64."""\nDANE = (\n' + '    "QUJD"\n' * 6000 + ")\n", encoding="utf-8")
+        self.generate()
+        index = (self.folder / "INDEX.md").read_text(encoding="utf-8")
+        self.assertIn("[[pkg._intro]] — Animacja zakodowana base64. (dane, 6004 l.)", index)
+        self.assertIn("Plik z danymi", (self.folder / "pkg._intro.md").read_text(encoding="utf-8"))
+        self.assertNotIn("dane,", index.split("[[pkg.baza]]")[1].split("\n")[0])
 
     def test_log_keeps_newest_thirty(self):
         for i in range(35):
