@@ -146,6 +146,9 @@ class Api:
     def start_files(self):
         return self._session.start_files()
 
+    def choose_proposals(self, message_id, selected=None, note=""):
+        return self._session.choose_proposals(message_id, selected, note)
+
     def retry_with(self, agent, mode):
         return self._session.retry_with(agent, mode)
 

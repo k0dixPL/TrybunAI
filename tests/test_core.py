@@ -31,6 +31,8 @@ if "ZLE" in data:
 reply = "odp zażółć"
 if "WERDYKT: AKCEPTUJĘ" in data:  # a reviewer: remarks first, acceptance on the re-check
     reply = "dobrze\nWERDYKT: AKCEPTUJĘ" if "ponowne sprawdzenie" in data else "błąd w pliku\nWERDYKT: UWAGI"
+if "PROPOZYCJE" in data:  # a debate summary
+    reply = "Stanęło na JSON.\n\n**PROPOZYCJE:**\n1. Zapis do settings.json\n2. **Pole schema** (sporne)\n3. Migracja"
 print(json.dumps({"type": "init", "session_id": "abc-123"}))
 print(json.dumps({"type": "message", "role": "assistant", "content": reply, "delta": True}), flush=True)
 print(json.dumps({"type": "result", "status": "success"}))
@@ -191,6 +193,13 @@ class Pure(unittest.TestCase):
         self.assertEqual(ev({"event": "result", "result": {"status": "SUCCESS", "response": "ok"}}), [])
         self.assertEqual(ev({"event": "result", "result": {"status": "ERROR", "error": "brak limitu"}}),
                          [("fatal", "brak limitu")])
+
+    def test_proposals_are_parsed_from_a_summary(self):
+        text = "Podsumowanie.\nDruga linia.\n\nPROPOZYCJE:\n1) Pierwsza\n2. **Druga**\n- trzecia\n\nKoniec gadania."
+        self.assertEqual(core.parse_proposals(text), ("Podsumowanie.\nDruga linia.", ["Pierwsza", "Druga", "trzecia"]))
+        self.assertEqual(core.parse_proposals("Bez listy.\n1. coś"), ("Bez listy.\n1. coś", []))
+        many = "PROPOZYCJE:\n" + "\n".join(f"{i}. p{i}" for i in range(1, 20))
+        self.assertEqual(len(core.parse_proposals(many)[1]), core.MAX_PROPOSALS)
 
     def test_claude_reports_context_size_and_skips_skills(self):
         self.assertIn("--disable-slash-commands", build_command("claude", "c", "read"))
@@ -549,7 +558,7 @@ class Runs(unittest.TestCase):
     def test_menu_debate_order_then_implement_then_review(self):
         self.session.update_settings({"modes": {"claude": "full"}})
         result, calls = self.menu_debate({"topic": "plan gry", "agents": ["codex", "gemini", "claude"], "rounds": 2,
-                                          "implementer": "claude", "review": True, "fix_rounds": 0})
+                                          "implementer": "claude", "review": True, "fix_rounds": 0, "confirm": False})
         self.assertTrue(result["ok"])
         self.assertEqual(calls, [("codex", "read"), ("gemini", "read"), ("claude", "read")] * 2 +
                          [("claude", "full"), ("codex", "read"), ("gemini", "read")],
@@ -563,7 +572,7 @@ class Runs(unittest.TestCase):
     def test_remarks_get_one_fix_round_then_a_recheck(self):
         self.session.update_settings({"modes": {"claude": "full"}})
         result, calls = self.menu_debate({"topic": "plan", "agents": ["claude", "codex"], "rounds": 1,
-                                          "implementer": "claude", "review": True, "fix_rounds": 2})
+                                          "implementer": "claude", "review": True, "fix_rounds": 2, "confirm": False})
         self.assertTrue(result["ok"])
         self.assertEqual(calls[2:], [("claude", "full"), ("codex", "read"), ("claude", "full"), ("codex", "read")])
         replies = [(m["agent"], m.get("label"), m.get("verdict")) for m in self.session.messages if m["role"] == "assistant"]
@@ -571,6 +580,52 @@ class Runs(unittest.TestCase):
                                        ("claude", "poprawki 1/2", None), ("codex", "sprawdzenie 2", "accept")],
                          "an acceptance ends the loop before the cap")
         self.assertTrue(any(e["t"] == "debate_end" and "Zaakceptowane" in e["text"] for e in self.events))
+
+    def test_debate_waits_for_the_users_pick_before_implementing(self):
+        self.session.update_settings({"modes": {"claude": "full"}})
+        result, calls = self.menu_debate({"topic": "plan", "agents": ["claude", "codex"], "rounds": 1,
+                                          "implementer": "claude", "review": True, "fix_rounds": 0})
+        self.assertTrue(result["ok"])
+        self.assertEqual(calls, [("claude", "read"), ("codex", "read"), ("claude", "read")],
+                         "the summary is written read-only and nothing is implemented yet")
+        summary = self.session.messages[-1]
+        self.assertEqual(summary["label"], "podsumowanie")
+        self.assertEqual(summary["summary"], "Stanęło na JSON.")
+        self.assertEqual(summary["proposals"], ["Zapis do settings.json", "Pole schema (sporne)", "Migracja"])
+        self.assertTrue(summary["pending"])
+        self.assertFalse(self.session._busy, "everybody is free while the user reads")
+        self.assertTrue(any(e["t"] == "debate_end" and "wybierz" in e["text"] for e in self.events))
+        self.assertFalse(self.session.choose_proposals(summary["id"], [])["ok"], "nothing picked")
+        self.assertFalse(self.session.choose_proposals(summary["id"], [7])["ok"])
+        self.assertFalse(self.session.choose_proposals("nie-ma", [0])["ok"])
+        calls.clear()
+        def fake(agent, exe, mode, *a, **k):
+            calls.append((agent, mode))
+            return [sys.executable, str(self.dir / "fake.py")]
+        with mock.patch.object(core, "build_command", fake):
+            self.assertTrue(self.session.choose_proposals(summary["id"], [2, 0], "bez zmian w UI")["ok"])
+            self.wait_idle()
+        self.assertEqual(calls, [("claude", "full"), ("codex", "read")])
+        choice = next(m for m in self.session.messages if m.get("choice"))
+        self.assertIn("- Zapis do settings.json\n- Migracja", choice["text"])
+        self.assertNotIn("schema", choice["text"])
+        self.assertIn("Moje uwagi: bez zmian w UI", choice["text"])
+        self.assertEqual((summary["pending"], summary["chosen"]), (False, [0, 2]))
+        labels = [m.get("label") for m in self.session.messages if m["role"] == "assistant"]
+        self.assertEqual(labels[-2:], ["wdrożenie", "sprawdzenie"])
+        self.assertIn("wybrane przez użytkownika", (self.dir / "last_prompt.txt").read_text(encoding="utf-8"))
+        self.assertFalse(self.session.choose_proposals(summary["id"], [0])["ok"], "decided only once")
+        self.assertTrue(any(e["t"] == "debate_end" and "wdrożył wybrane" in e["text"] for e in self.events))
+
+    def test_debate_summary_can_be_skipped(self):
+        self.session.update_settings({"modes": {"claude": "edit"}})
+        self.menu_debate({"topic": "plan", "agents": ["claude", "codex"], "rounds": 1, "implementer": "claude"})
+        summary = self.session.messages[-1]
+        self.assertTrue(self.session.choose_proposals(summary["id"], None)["ok"])
+        self.assertEqual((summary["pending"], summary["chosen"]), (False, None))
+        self.assertFalse(self.session._busy)
+        self.session.load()
+        self.assertFalse(self.session.messages[-1]["pending"], "the decision is saved")
 
     def test_blocked_actions_offer_a_one_time_retry(self):
         def parse(agent, obj):

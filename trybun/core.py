@@ -89,20 +89,67 @@ _IMPLEMENT_WORDS = re.compile(r"wdr[oó][żz]|wprowad[źz]|zaimplementuj|zakoduj
 CONTEXT_WARN = 150_000  # tokens; past this every step of a reply re-reads a huge session
 
 
-def build_implement_turn(agents):
+def build_implement_turn(agents, chosen=None, note=""):
+    """chosen: the proposals the user picked from the summary (None: implement the whole outcome)."""
     names = ", ".join(AGENTS[a]["label"] for a in agents)
-    return (f"Debata modeli ({names}) właśnie się zakończyła. Wdróż w plikach projektu to, na czym stanęło. "
-            "Trzymaj się ustaleń, nie dokładaj nowych pomysłów. Na końcu krótko wypisz, co zmieniłeś.")
+    if chosen is None:
+        return (f"Debata modeli ({names}) właśnie się zakończyła. Wdróż w plikach projektu to, na czym stanęło. "
+                "Trzymaj się ustaleń, nie dokładaj nowych pomysłów. Na końcu krótko wypisz, co zmieniłeś.")
+    if chosen:
+        picked = "Użytkownik przeczytał podsumowanie debaty i wybrał do wdrożenia tylko te propozycje:\n" + \
+            "\n".join(f"- {c}" for c in chosen) + "\n\nWdróż dokładnie je; pozostałych propozycji nie ruszaj."
+    else:
+        picked = "Użytkownik przeczytał podsumowanie debaty i nie wybrał żadnej z propozycji z listy."
+    extra = f"\n\nUwagi użytkownika (mają pierwszeństwo przed ustaleniami debaty):\n{note}" if note else ""
+    return (f"{picked}{extra}\n\nNie dokładaj nowych pomysłów. Na końcu krótko wypisz, co zmieniłeś.")
+
+
+def build_summary_turn(agents):
+    names = ", ".join(AGENTS[a]["label"] for a in agents)
+    return (f"Debata modeli ({names}) się zakończyła. Zanim cokolwiek zostanie wdrożone, użytkownik przeczyta "
+            "podsumowanie i sam wybierze, co wdrożyć. Niczego nie zmieniaj w plikach.\n"
+            "Napisz po polsku krótkie podsumowanie (2–5 zdań): na czym stanęło i gdzie zostały różnice zdań. "
+            "Potem osobna linia „PROPOZYCJE:” i pod nią ponumerowana lista konkretnych zmian do wdrożenia, "
+            "każda w jednej linii, od najważniejszej, najwyżej 10. Każda propozycja ma być zrozumiała bez "
+            "czytania debaty (co i gdzie zmienić). Przy propozycji, co do której modele się nie zgodziły, "
+            "dopisz na końcu „(sporne)”. Po liście nic już nie pisz.")
+
+
+_PROPOSALS = re.compile(r"^[\s#>*_]*PROPOZYCJE[\s*_]*:?[\s*_]*$", re.I | re.M)
+_ITEM = re.compile(r"^\s*(?:\d{1,2}[.)]|[-*•])\s+(.+?)\s*$")
+MAX_PROPOSALS = 12
+
+
+def parse_proposals(text):
+    """(summary, [proposal, ...]) from a summary turn; no PROPOZYCJE line gives (text, [])."""
+    text = text or ""
+    found = list(_PROPOSALS.finditer(text))
+    if not found:
+        return text.strip(), []
+    head, tail = text[:found[-1].start()], text[found[-1].end():]
+    items = []
+    for line in tail.splitlines():
+        match = _ITEM.match(line)
+        if match:
+            item = re.sub(r"\*\*(.+?)\*\*", r"\1", match.group(1)).strip()
+            if item:
+                items.append(item[:500])
+        elif line.strip() and items:
+            break  # the list ended
+    return head.strip(), items[:MAX_PROPOSALS]
 
 
 VERDICTS = {"accept": "AKCEPTUJĘ", "remarks": "UWAGI", "unverified": "NIE MOGĘ SPRAWDZIĆ"}
 _VERDICT = re.compile(r"WERDYKT\s*:?\s*\**\s*(AKCEPTUJ|UWAGI|NIE\s+MOG)", re.I)
 
 
-def build_review_turn(implementer, attempt=1):
+def build_review_turn(implementer, attempt=1, chosen=False):
     again = " To ponowne sprawdzenie po poprawkach: oceń, czy uwagi zostały usunięte." if attempt > 1 else ""
-    return (f"{AGENTS[implementer]['label']} wdrożył ustalenia z debaty.{again} Sprawdź zmienione pliki: "
-            "czy zrobił to, co uzgodniliśmy, i czy coś się nie zepsuło. Wypisz konkretne błędy i poprawki, "
+    what = ("propozycje z debaty wybrane przez użytkownika (jego wybór jest wyżej w czacie)" if chosen
+            else "ustalenia z debaty")
+    goal = "to, co wybrał użytkownik" if chosen else "to, co uzgodniliśmy"
+    return (f"{AGENTS[implementer]['label']} wdrożył {what}.{again} Sprawdź zmienione pliki: "
+            f"czy zrobił {goal}, i czy coś się nie zepsuło. Wypisz konkretne błędy i poprawki, "
             "krótko. Niczego nie zmieniaj. Drobiazgi i kwestie gustu pomiń: uwagi tylko o realnych błędach "
             "i odstępstwach od ustaleń.\n"
             "Zakończ osobną ostatnią linią, dokładnie jedną z trzech:\n"
@@ -498,6 +545,8 @@ class Session:
             review = bool(plan.get("review")) and bool(implementer)
             # Reviewers rarely agree on details, so fix rounds are capped to stop an endless loop.
             fix_rounds = max(0, min(MAX_FIX_ROUNDS, int(plan.get("fix_rounds", 1)))) if review else 0
+            # By default the user reads a summary and picks what gets implemented.
+            confirm = bool(plan.get("confirm", True)) and bool(implementer)
             attachments = list(plan.get("attachments") or [])
         except (TypeError, ValueError):
             return {"ok": False, "error": "Nieprawidłowe ustawienia debaty."}
@@ -537,7 +586,7 @@ class Session:
             self.save()
         self.emit({"t": "message", "message": msg})
         threading.Thread(target=self._run_debate,
-                         args=(agents, rounds, topic, attachments, implementer, review, fix_rounds),
+                         args=(agents, rounds, topic, attachments, implementer, review, fix_rounds, confirm),
                          daemon=True).start()
         warn = None
         if not implementer and _IMPLEMENT_WORDS.search(topic):
@@ -545,7 +594,8 @@ class Session:
                     "Wybierz „Kto wdraża” w menu Debata albo napisz potem np. @claude wdrażaj.")
         return {"ok": True, "warn": warn}
 
-    def _run_debate(self, agents, rounds, topic, attachments, implementer=None, review=False, fix_rounds=0):
+    def _run_debate(self, agents, rounds, topic, attachments, implementer=None, review=False, fix_rounds=0,
+                    confirm=False):
         everybody = agents + ([implementer] if implementer and implementer not in agents else [])
         outcome = f"Debata zakończona ({rounds} z {rounds} rund)."
         try:
@@ -568,53 +618,131 @@ class Session:
                         return
             if not implementer:
                 return
-            # The implementer works with its own permissions; the debate itself stayed read-only.
-            status = self._after_debate_turn(implementer, build_implement_turn(agents), None, "wdrożenie")
-            if status != "ok":
-                outcome += " Wdrożenie " + ("zatrzymano." if status == "stopped" else "przerwał błąd modelu.")
-                return
-            outcome += f" {AGENTS[implementer]['label']} wdrożył ustalenia."
-            reviewers = [a for a in agents if a != implementer]
-            if not review or not reviewers:
-                return
-            for attempt in range(1, fix_rounds + 2):
-                verdicts = {}
-                for agent in reviewers:
-                    label = "sprawdzenie" if attempt == 1 else f"sprawdzenie {attempt}"
-                    status = self._after_debate_turn(agent, build_review_turn(implementer, attempt), "read", label,
-                                                     verdict=True)
-                    if status != "ok":
-                        outcome += " Sprawdzanie przerwano."
-                        return
-                    verdicts[agent] = self._last_verdict(agent)
-                complaining = [a for a, v in verdicts.items() if v == "remarks"]
-                if not complaining or attempt > fix_rounds:
-                    break
-                status = self._after_debate_turn(implementer, build_fix_turn(complaining), None,
-                                                 f"poprawki {attempt}/{fix_rounds}")
+            if confirm:
+                plan = {"implementer": implementer, "agents": agents, "review": review, "fix_rounds": fix_rounds}
+                status = self._after_debate_turn(implementer, build_summary_turn(agents), "read", "podsumowanie",
+                                                 proposals=plan)
                 if status != "ok":
-                    outcome += " Poprawki przerwano."
+                    outcome += " Podsumowanie " + ("zatrzymano." if status == "stopped" else "przerwał błąd modelu.")
                     return
-            outcome += " " + _verdict_summary(verdicts)
+                outcome += " Przeczytaj podsumowanie i wybierz, co wdrożyć."
+                return
+            outcome += self._implement_and_review(agents, implementer, review, fix_rounds, build_implement_turn(agents))
         except Exception as exc:  # participants must never stay busy forever
             outcome = f"Debata przerwana: {type(exc).__name__}: {exc}"
         finally:
-            with self._lock:
-                big = [a for a in everybody if self._too_big(a)] if self.settings.get("auto_fresh", True) else []
-            if big:
-                self._refresh_sessions(big, True)
-            with self._lock:
-                self._busy.difference_update(everybody)
-                self._busy.discard("debate")
-                self._stop_requested.difference_update(everybody)
-            self.emit({"t": "debate_end", "text": outcome})
+            self._end_debate(everybody, outcome)
 
-    def _after_debate_turn(self, agent, body, mode, label, verdict=False):
+    def _end_debate(self, everybody, outcome):
+        with self._lock:
+            big = [a for a in everybody if self._too_big(a)] if self.settings.get("auto_fresh", True) else []
+        if big:
+            self._refresh_sessions(big, True)
+        with self._lock:
+            self._busy.difference_update(everybody)
+            self._busy.discard("debate")
+            self._stop_requested.difference_update(everybody)
+        self.emit({"t": "debate_end", "text": outcome})
+
+    def _implement_and_review(self, agents, implementer, review, fix_rounds, body, chosen=False):
+        """The implementer works with its own permissions; the debate itself stayed read-only.
+        Returns the text for the closing note."""
+        status = self._after_debate_turn(implementer, body, None, "wdrożenie")
+        if status != "ok":
+            return " Wdrożenie " + ("zatrzymano." if status == "stopped" else "przerwał błąd modelu.")
+        outcome = f" {AGENTS[implementer]['label']} wdrożył " + ("wybrane propozycje." if chosen else "ustalenia.")
+        reviewers = [a for a in agents if a != implementer]
+        if not review or not reviewers:
+            return outcome
+        for attempt in range(1, fix_rounds + 2):
+            verdicts = {}
+            for agent in reviewers:
+                label = "sprawdzenie" if attempt == 1 else f"sprawdzenie {attempt}"
+                status = self._after_debate_turn(agent, build_review_turn(implementer, attempt, chosen), "read",
+                                                 label, verdict=True)
+                if status != "ok":
+                    return outcome + " Sprawdzanie przerwano."
+                verdicts[agent] = self._last_verdict(agent)
+            complaining = [a for a, v in verdicts.items() if v == "remarks"]
+            if not complaining or attempt > fix_rounds:
+                break
+            status = self._after_debate_turn(implementer, build_fix_turn(complaining), None,
+                                             f"poprawki {attempt}/{fix_rounds}")
+            if status != "ok":
+                return outcome + " Poprawki przerwano."
+        return outcome + " " + _verdict_summary(verdicts)
+
+    def choose_proposals(self, message_id, selected=None, note=""):
+        """The user's pick from a debate summary. selected=None skips the implementation."""
+        note = str(note or "").strip()[:4000]
+        with self._lock:
+            msg = next((m for m in self.messages if m.get("id") == message_id), None)
+            if not msg or not msg.get("plan"):
+                return {"ok": False, "error": "Nie ma już tego podsumowania."}
+            if not msg.get("pending"):
+                return {"ok": False, "error": "O tym podsumowaniu już zdecydowano."}
+            plan, items = msg["plan"], msg.get("proposals") or []
+            if selected is None:
+                msg["pending"] = False
+                msg["chosen"] = None
+                self.save()
+                self.emit({"t": "proposals", "message": msg})
+                return {"ok": True}
+            try:
+                picked = sorted({int(i) for i in selected})
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "Nieprawidłowy wybór."}
+            if any(not 0 <= i < len(items) for i in picked):
+                return {"ok": False, "error": "Nieprawidłowy wybór."}
+            if items and not picked and not note:
+                return {"ok": False, "error": "Zaznacz co najmniej jedną propozycję, dopisz uwagi albo kliknij „Nie wdrażaj”."}
+            implementer, agents = plan["implementer"], plan["agents"]
+            everybody = list(dict.fromkeys(agents + [implementer]))
+            if "debate" in self._busy:
+                return {"ok": False, "error": "Trwa debata. Poczekaj albo ją zatrzymaj."}
+            missing = [AGENTS[a]["label"] for a in everybody if not self._binaries.get(a)]
+            if missing:
+                return {"ok": False, "error": f"Nie znaleziono CLI: {', '.join(missing)}."}
+            busy = [AGENTS[a]["label"] for a in everybody if a in self._busy]
+            if busy:
+                return {"ok": False, "error": f"Jeszcze pracuje: {', '.join(busy)}."}
+            if self.settings["modes"].get(implementer, "read") == "read":
+                return {"ok": False, "error": f"{AGENTS[implementer]['label']} ma uprawnienia „Tylko odczyt”, "
+                                              "więc nie wdroży zmian. Zmień mu uprawnienia."}
+            chosen = [items[i] for i in picked] if items else None
+            msg["pending"] = False
+            msg["chosen"] = picked
+            lines = [f"- {c}" for c in chosen or []] or ["- ustalenia z podsumowania w całości"]
+            text = "Wdrażaj wybrane propozycje:\n" + "\n".join(lines) + (f"\n\nMoje uwagi: {note}" if note else "")
+            choice = self._new_message("user", text=text, targets=[implementer], choice=True)
+            self.messages.append(choice)
+            self._busy.update(everybody)
+            self._busy.add("debate")
+            self.save()
+        self.emit({"t": "proposals", "message": msg})
+        self.emit({"t": "message", "message": choice})
+        body = build_implement_turn(agents, chosen, note) if items else (
+            build_implement_turn(agents) + (f"\n\nUwagi użytkownika:\n{note}" if note else ""))
+        threading.Thread(target=self._run_choice, args=(plan, everybody, body, bool(items)), daemon=True).start()
+        return {"ok": True}
+
+    def _run_choice(self, plan, everybody, body, chosen):
+        outcome = "Wdrożenie wybranych propozycji:"
+        try:
+            outcome += self._implement_and_review(plan["agents"], plan["implementer"], plan["review"],
+                                                  plan["fix_rounds"], body, chosen)
+        except Exception as exc:  # participants must never stay busy forever
+            outcome = f"Wdrożenie przerwane: {type(exc).__name__}: {exc}"
+        finally:
+            self._end_debate(everybody, outcome)
+
+    def _after_debate_turn(self, agent, body, mode, label, verdict=False, proposals=None):
         with self._lock:
             if agent in self._stop_requested:
                 return "stopped"
             count = len(self.messages) + 1
-        return self._run_turn(agent, body, count, mode=mode, keep_busy=True, turn_label=label, verdict=verdict)
+        return self._run_turn(agent, body, count, mode=mode, keep_busy=True, turn_label=label, verdict=verdict,
+                              proposals=proposals)
 
     def _last_verdict(self, agent):
         with self._lock:
@@ -656,7 +784,7 @@ class Session:
         return {"ok": True}
 
     def _run_turn(self, agent, body, count, attachments=(), mode=None, keep_busy=False, turn_label=None,
-                  verdict=False):
+                  verdict=False, proposals=None):
         """Runs one model once and returns the reply's status."""
         run_id = uuid.uuid4().hex
         self.emit({"t": "start", "id": run_id, "agent": agent, "label": turn_label})
@@ -718,6 +846,10 @@ class Session:
                 msg["usage"] = usage
             if verdict and status == "ok":
                 msg["verdict"] = parse_verdict(result.text)
+            if proposals and status == "ok":  # a debate summary waiting for the user's pick
+                msg["summary"], msg["proposals"] = parse_proposals(result.text)
+                msg["plan"] = proposals
+                msg["pending"] = True
             # Debaters and reviewers are read-only on purpose, so their blocked attempts need no decision.
             read_only_by_design = bool(turn_label) and turn_label.startswith(("runda", "sprawdzenie"))
             if result.denied and not read_only_by_design and mode != "full":

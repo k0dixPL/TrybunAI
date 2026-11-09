@@ -83,6 +83,25 @@ header img{height:30px;width:30px}
 .needcard{margin-top:8px;padding:8px 11px;border:1px solid var(--prompter);border-radius:8px;font-size:13px}
 .needcard ul{margin:4px 0 7px;padding-left:20px;font:12px Consolas,monospace;color:var(--dim)}
 .needcard button{border-color:var(--prompter);color:var(--prompter);font-size:12.5px}
+.propcard{margin-top:10px;padding:10px 13px;border:1px solid color-mix(in srgb,var(--haiku) 55%,transparent);border-radius:9px;
+  background:color-mix(in srgb,var(--haiku) 6%,transparent)}
+.propcard h4{margin:0 0 6px;font-size:13.5px;font-weight:600}
+.propcard h4 span{color:var(--dim);font-weight:400}
+.propcard label{display:flex;gap:9px;align-items:flex-start;padding:4px 2px;cursor:pointer;border-radius:5px}
+.propcard label:hover{background:#ffffff08}
+.propcard input[type=checkbox]{margin-top:4px;flex:none}
+.propcard .no{color:var(--dim);font-size:12px;margin-left:4px}
+.propcard .sporne{color:var(--haiku);font-size:12px}
+.propcard textarea{width:100%;min-height:44px;margin:8px 0;resize:vertical;font:inherit;font-size:13px;
+  background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 8px;box-sizing:border-box}
+.propcard .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.propcard .go{background:#3d6fd1;border-color:#3d6fd1;color:#fff}
+.propcard .go:disabled{opacity:.5}
+.propcard .links{margin-left:auto;font-size:12px;color:var(--dim)}
+.propcard .links a{color:var(--dim);cursor:pointer;text-decoration:underline}
+.propcard ol{margin:4px 0 6px;padding-left:22px}
+.propcard li.off{color:var(--dim);text-decoration:line-through}
+.propcard .done{color:var(--dim);font-size:12.5px}
 .needcard small{color:var(--dim);margin-left:8px;font-size:12px}
 .ctxwarn{margin-top:7px;padding:6px 9px;border:1px solid var(--haiku);border-radius:7px;font-size:12.5px;color:var(--haiku);display:flex;gap:10px;align-items:center}
 .ctxwarn button{font-size:12px;padding:1px 9px;white-space:nowrap}
@@ -271,7 +290,7 @@ dialog input#mapexclude{width:250px}
     <p><b>Folder projektu.</b> Modele pracują w folderze, w którym leży exe (zmienisz go, klikając ścieżkę na górze). Historia czatu i pamięć projektu są w <code>.trybunai</code>.</p>
     <p><b>Czat.</b> Przyciski modeli na dole wybierają, kto odpowiada. Możesz też zacząć od <code>@claude</code>, <code>@codex</code>, <code>@agy</code>, <code>@haiku</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p>
     <p><b>Uprawnienia</b> (obok modeli) dotyczą wybranego modelu: tylko odczyt, edycja plików albo pełny dostęp. Gdy model chce więcej, pod odpowiedzią pojawia się kartka z przyciskiem jednorazowej zgody.</p>
-    <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem wybrany model wdraża ustalenia, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić.</p>
+    <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem model, który ma wdrażać, pisze podsumowanie z ponumerowanymi propozycjami, a Ty zaznaczasz, co wdrożyć (punkty sporne są domyślnie odznaczone), i możesz dopisać uwagi. Dopiero wtedy wdraża wybrane punkty, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić. Bez podsumowania (wdrożenie od razu) ustawisz to w menu Debata.</p>
     <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
     <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
     <p><b>Mapa</b> (na górze) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
@@ -291,6 +310,7 @@ dialog input#mapexclude{width:250px}
   <label>Kto kończy <select id="deblast"></select></label>
   <div id="deborder"></div>
   <label>Kto wdraża po debacie <select id="debimpl"></select></label>
+  <label style="justify-content:flex-start"><input id="debconfirm" type="checkbox" checked> Najpierw podsumowanie: sam wybierasz, co wdrożyć</label>
   <label style="justify-content:flex-start"><input id="debreview" type="checkbox"> Pozostali sprawdzą wdrożenie</label>
   <label>Rundy poprawek po uwagach <select id="debfix"><option value="0">0 (tylko werdykt)</option><option value="1" selected>1</option><option value="2">2</option></select></label>
   <div id="deberr" class="err" role="alert"></div>
@@ -487,6 +507,88 @@ function finish(parts, msg) {
   addVerdict(parts, msg);
   addUsage(parts, msg);
   addNeeds(parts, msg);
+  addProposals(parts, msg);
+}
+// ---- debate summary: the user picks what gets implemented ----------------
+function addProposals(parts, msg) {
+  if (!msg.plan) return;
+  // The list lives in the card, so the bubble shows only the summary above it.
+  const bodyText = msg.summary || "";
+  parts.b.innerHTML = markdown(bodyText);
+  parts.b.append(proposalCard(msg));
+}
+function inlineCode(text) {  // `name` as <code>, the rest as plain text (never HTML)
+  return text.split("`").map((part, i) => {
+    if (i % 2 === 0) return document.createTextNode(part);
+    const c = document.createElement("code"); c.textContent = part; return c;
+  });
+}
+function proposalCard(msg) {
+  const c = document.createElement("div"); c.className = "propcard"; c.dataset.msg = msg.id;
+  const items = msg.proposals || [], plan = msg.plan;
+  const reviewers = plan.review ? plan.agents.filter(a => a !== plan.implementer) : [];
+  const h = document.createElement("h4");
+  h.append(msg.pending ? "Co wdrożyć? " : "Propozycje z debaty ");
+  const who = document.createElement("span");
+  who.textContent = `· wdraża ${S.agents[plan.implementer].label}` +
+    (reviewers.length ? `, sprawdza ${reviewers.map(a => S.agents[a].label).join(", ")}` : "");
+  h.append(who); c.append(h);
+  if (!msg.pending) {
+    const ol = document.createElement("ol");
+    items.forEach((t, i) => {
+      const li = document.createElement("li"); li.append(...inlineCode(t));
+      if (!msg.chosen || !msg.chosen.includes(i)) li.className = "off";
+      ol.append(li);
+    });
+    if (items.length) c.append(ol);
+    const d = document.createElement("div"); d.className = "done";
+    d.textContent = msg.chosen ? (items.length ? `Wybrano do wdrożenia: ${msg.chosen.length} z ${items.length}.` : "Wybrano wdrożenie ustaleń w całości.")
+                               : "Pominięto: nic nie zostało wdrożone.";
+    c.append(d); return c;
+  }
+  const boxes = items.map((t, i) => {
+    const l = document.createElement("label"), cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = i;
+    const disputed = /\(sporne\)\s*$/i.test(t);
+    cb.checked = !disputed;
+    const span = document.createElement("span"); span.append(`${i + 1}. `, ...inlineCode(t.replace(/\s*\(sporne\)\s*$/i, "")));
+    l.append(cb, span);
+    if (disputed) { const sp = document.createElement("span"); sp.className = "sporne"; sp.textContent = " sporne"; span.append(sp); }
+    c.append(l); return cb;
+  });
+  if (!items.length) {
+    const n = document.createElement("div"); n.className = "done";
+    n.textContent = "Model nie podał listy propozycji. Możesz wdrożyć ustalenia w całości albo dopisać, co dokładnie zrobić.";
+    c.append(n);
+  }
+  const note = document.createElement("textarea");
+  note.placeholder = "Twoje uwagi do wdrożenia (opcjonalnie), np. „bez zmian w wyglądzie”";
+  const row = document.createElement("div"); row.className = "row";
+  const go = document.createElement("button"); go.type = "button"; go.className = "go";
+  const skip = document.createElement("button"); skip.type = "button"; skip.textContent = "Nie wdrażaj";
+  const refresh = () => {
+    const n = boxes.filter(b => b.checked).length;
+    go.textContent = items.length ? `Wdróż zaznaczone (${n})` : "Wdróż ustalenia";
+    go.disabled = items.length > 0 && n === 0 && !note.value.trim();
+  };
+  boxes.forEach(b => b.onchange = refresh); note.oninput = refresh;
+  go.onclick = async () => {
+    go.disabled = true;
+    const r = await api.choose_proposals(msg.id, boxes.filter(b => b.checked).map(b => +b.value), note.value);
+    if (!r.ok) { toast(r.error); refresh(); }
+  };
+  skip.onclick = async () => { const r = await api.choose_proposals(msg.id, null, ""); if (!r.ok) toast(r.error); };
+  row.append(go, skip);
+  if (items.length > 1) {
+    const links = document.createElement("span"); links.className = "links";
+    const all = document.createElement("a"); all.textContent = "zaznacz wszystkie";
+    const none = document.createElement("a"); none.textContent = "odznacz";
+    all.onclick = () => { boxes.forEach(b => b.checked = true); refresh(); };
+    none.onclick = () => { boxes.forEach(b => b.checked = false); refresh(); };
+    links.append(all, " · ", none); row.append(links);
+  }
+  c.append(note, row); refresh();
+  return c;
 }
 const VERDICT_TEXT = {accept: "AKCEPTUJĘ", remarks: "UWAGI", unverified: "NIE MÓGŁ SPRAWDZIĆ"};
 function addVerdict(parts, msg) {
@@ -636,6 +738,8 @@ window.onEvents = events => {
       const r = runs.get(e.id); if (!r) continue;
       if (e.message.status !== "error" && !S.live_sessions.includes(e.agent)) S.live_sessions.push(e.agent);
       r.st.remove(); finish(r.parts, e.message); runs.delete(e.id); workEnd(e.id);
+    } else if (e.t === "proposals") {
+      document.querySelector(`.propcard[data-msg="${e.message.id}"]`)?.replaceWith(proposalCard(e.message));
     } else if (e.t === "debate_end" || e.t === "note") {
       addLine($("items"), "note", e.text);
     } else if (e.t === "fresh") {
@@ -715,6 +819,7 @@ function debRefresh(changed) {
   $("deborder").textContent = order.length > 1 ? "Kolejność w każdej rundzie: " + order.map(a => S.agents[a].label).join(" → ") : "";
   const impl = $("debimpl").value;
   $("debreview").disabled = !impl;
+  $("debconfirm").disabled = !impl;
   if (!impl) $("debreview").checked = false;
   $("debfix").disabled = !$("debreview").checked;
   $("deberr").textContent = impl && (S.settings.modes[impl] || "read") === "read"
@@ -738,6 +843,7 @@ function openDebate() {
   if (defaults.includes(saved.first)) { $("debfirst").value = saved.first; debRefresh("first"); }
   if (defaults.includes(saved.last)) { $("deblast").value = saved.last; debRefresh("last"); }
   $("debreview").checked = !!saved.review && !!impl.value;
+  $("debconfirm").checked = saved.confirm !== false;
   $("debfix").value = String(saved.fix_rounds ?? 1);
   debRefresh();
   $("debdlg").showModal(); $("debtopic").focus();
@@ -745,12 +851,12 @@ function openDebate() {
 async function startDebate() {
   const plan = {topic: $("debtopic").value.trim(), agents: debOrder(), rounds: +$("debrounds").value,
                 implementer: $("debimpl").value || null, review: $("debreview").checked,
-                fix_rounds: +$("debfix").value, attachments: files.map(f => f.path)};
+                fix_rounds: +$("debfix").value, confirm: $("debconfirm").checked, attachments: files.map(f => f.path)};
   const r = await api.debate(plan);
   if (!r.ok) { $("deberr").textContent = r.error; return; }
   try { localStorage.setItem("debate", JSON.stringify({agents: plan.agents, rounds: plan.rounds, first: plan.agents[0],
         last: plan.agents[plan.agents.length - 1], implementer: plan.implementer, review: plan.review,
-        fix_rounds: plan.fix_rounds})); } catch (e) {}
+        fix_rounds: plan.fix_rounds, confirm: plan.confirm})); } catch (e) {}
   $("debdlg").close();
   files = []; drawFiles(); $("input").value = ""; grow();
   if (r.warn) toast(r.warn);

@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.0.17 — 2026-11-09
+- Debata z wdrażaniem nie przechodzi już sama do zmian w plikach. Model, który ma wdrażać, najpierw pisze
+  (tylko do odczytu) podsumowanie: na czym stanęło, gdzie zostały różnice zdań, oraz ponumerowaną listę
+  propozycji. Pod podsumowaniem pojawia się karta: zaznaczasz, co wdrożyć (punkty sporne są domyślnie
+  odznaczone), możesz dopisać uwagi, potem „Wdróż zaznaczone” albo „Nie wdrażaj”. Modele czekają, ile
+  trzeba; wybór przetrwa zamknięcie programu.
+- Wdrażający dostaje tylko wybrane punkty, a sprawdzający oceniają zgodność z Twoim wyborem.
+- Menu Debata: „Najpierw podsumowanie: sam wybierasz, co wdrożyć” (domyślnie włączone; wyłączone daje
+  dawne automatyczne wdrożenie).
+
 ## 1.0.16 — 2026-11-09
 - Na górnym pasku widać, kto teraz pracuje: świecąca pigułka w kolorze modelu z czasem pracy i bieżącą
   czynnością (np. „Edit: ui/index.html”), a pod paskiem przesuwa się smuga światła. Kliknięcie przewija

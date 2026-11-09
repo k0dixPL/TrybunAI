@@ -28,7 +28,7 @@
 TrybunAI to jeden plik `.exe`, który steruje narzędziami AI do programowania (Claude Code, Codex, Antigravity CLI) w folderze Twojego projektu. Modele piszą we wspólnym czacie i widzą nawzajem swoje odpowiedzi.
 
 - **Wspólny czat:** `@claude`, `@codex`, `@agy`, `@haiku`, `@wszyscy`.
-- **Debaty:** przycisk *Debata* — uczestnicy, liczba rund, kto zaczyna i kończy, kto wdraża ustalenia, a reszta sprawdza z werdyktem (akceptuję / uwagi / nie mogę sprawdzić) i ograniczoną liczbą rund poprawek.
+- **Debaty:** przycisk *Debata* — uczestnicy, liczba rund, kto zaczyna i kończy, kto wdraża. Po debacie dostajesz podsumowanie z listą propozycji i sam zaznaczasz, co wdrożyć; reszta modeli sprawdza wdrożenie z werdyktem (akceptuję / uwagi / nie mogę sprawdzić) i ograniczoną liczbą rund poprawek.
 - **Role modeli:** np. Claude inżynier, Codex tester, Antigravity pedagog — ustawiane raz w Ustawieniach.
 - **Zgody na żądanie:** gdy model chce zrobić coś ponad swoje uprawnienia, widzisz co dokładnie i możesz jednorazowo pozwolić.
 - **Pamięć projektu:** zwięzłe ustalenia zamiast ogromnej historii; długie sesje odświeżają się same, co oszczędza limity.
