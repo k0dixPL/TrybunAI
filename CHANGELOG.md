@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.0.18 — 2026-11-09
+- Usunięto animowany pasek pracy z nagłówka. Podczas pracy modelu całe okno delikatnie pulsuje
+  poświatą w kolorze aktywnego modelu; efekt respektuje ustawienie ograniczonego ruchu.
+
 ## 1.0.17 — 2026-11-09
 - Debata z wdrażaniem nie przechodzi już sama do zmian w plikach. Model, który ma wdrażać, najpierw pisze
   (tylko do odczytu) podsumowanie: na czym stanęło, gdzie zostały różnice zdań, oraz ponumerowaną listę

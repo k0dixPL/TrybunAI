@@ -18,34 +18,12 @@ select,input[type=text]{background:var(--panel2);border:1px solid var(--line);bo
 :focus-visible{outline:2px solid #7a8499;outline-offset:1px}
 header{display:flex;gap:9px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{font-size:15px}
-header{position:relative}
-header::after{content:"";position:absolute;bottom:-1px;left:-30%;width:30%;height:2px;opacity:0;pointer-events:none;
-  background:linear-gradient(90deg,transparent,var(--beam,var(--claude)),transparent);transition:opacity .4s}
-header.busy::after{opacity:1;animation:beam 1.8s cubic-bezier(.45,0,.55,1) infinite}
-@keyframes beam{from{left:-30%}to{left:100%}}
-#working{display:flex;gap:7px;min-width:0;flex-shrink:1;overflow:hidden}
-#working:empty{display:none}
-.wk{--c:var(--dim);position:relative;display:flex;align-items:center;gap:7px;flex-shrink:1;min-width:0;max-width:330px;
-  padding:4px 11px 4px 8px;border-radius:999px;font-size:13px;white-space:nowrap;overflow:hidden;cursor:pointer;
-  color:var(--text);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);
-  background:color-mix(in srgb,var(--c) 11%,transparent);box-shadow:0 0 14px -4px var(--c)}
-.wk::after{content:"";position:absolute;inset:0;pointer-events:none;transform:translateX(-100%);
-  background:linear-gradient(100deg,transparent 25%,color-mix(in srgb,var(--c) 30%,transparent) 50%,transparent 75%);
-  animation:scan 2.4s ease-in-out infinite}
-@keyframes scan{to{transform:translateX(100%)}}
-.wk .orb{position:relative;width:14px;height:14px;flex:none}
-.wk .orb::before{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--c);box-shadow:0 0 7px 1px var(--c);
-  animation:pulse 1.3s ease-in-out infinite}
-.wk .orb::after{content:"";position:absolute;inset:0;border-radius:50%;border:1.5px solid transparent;
-  border-top-color:var(--c);border-left-color:var(--c);animation:spin .9s linear infinite}
-@keyframes pulse{50%{transform:scale(.6);opacity:.65}}
-@keyframes spin{to{transform:rotate(360deg)}}
-.wk b{color:var(--c);font-weight:600}
-.wk .tm{font-variant-numeric:tabular-nums;color:var(--dim)}
-.wk .ac{color:var(--dim);overflow:hidden;text-overflow:ellipsis;min-width:0}
-#working.many .ac{display:none}
-#working.many .wk{flex-shrink:0}
-@media (prefers-reduced-motion:reduce){header.busy::after,.wk::after,.wk .orb::before,.wk .orb::after{animation:none}}
+body::after{content:"";position:fixed;inset:0;z-index:10;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,color-mix(in srgb,var(--work-color,var(--claude)) 13%,transparent),transparent 75%);
+  transition:opacity .7s ease}
+body.busy::after{opacity:1;animation:aiGlow 3.2s ease-in-out infinite alternate}
+@keyframes aiGlow{from{opacity:.35}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){body.busy::after{animation:none;opacity:.65;transition:none}}
 #statsimport{color:var(--dim);font-size:13px;margin:-4px 0 10px}
 #statsimport:empty{display:none}
 header img{height:30px;width:30px}
@@ -232,7 +210,6 @@ dialog input#mapexclude{width:250px}
   <img class="logo" alt="" width="30" height="30">
   <b>TrybunAI</b>
   <button id="project" title="Zmień folder projektu"></button>
-  <div id="working" aria-live="polite"></div>
   <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
   <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
@@ -675,39 +652,14 @@ function drawChips() {
   }
 }
 
-// ---- "pracuje" pills on the top bar --------------------------------------
-const working = new Map();  // run id -> {pill, started, time, act}
-let workTimer = null;
-const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-function workStart(key, agent, name, target) {
-  const pill = document.createElement("div"); pill.className = "wk"; pill.style.setProperty("--c", `var(--${agent})`);
-  pill.title = `${name} pracuje. Kliknij, żeby przewinąć do odpowiedzi.`;
-  const orb = document.createElement("span"); orb.className = "orb";
-  const who = document.createElement("b"); who.textContent = name;
-  const time = document.createElement("span"); time.className = "tm"; time.textContent = "0:00";
-  const act = document.createElement("span"); act.className = "ac"; act.textContent = "myśli…";
-  pill.append(orb, who, time, act);
-  pill.onclick = () => target?.()?.scrollIntoView({behavior: "smooth", block: "end"});
-  $("working").append(pill);
-  working.set(key, {pill, started: Date.now(), time, act, agent});
-  drawWorking();
-}
-function workAct(key, text) {
-  const w = working.get(key); if (!w) return;
-  w.act.textContent = text; w.pill.title = `${w.pill.querySelector("b").textContent}: ${text}`;
-}
-function workEnd(key) { const w = working.get(key); if (!w) return; w.pill.remove(); working.delete(key); drawWorking(); }
+// ---- model activity glow ---------------------------------------------------
+const working = new Map();  // run id -> agent id
+function workStart(key, agent) { working.set(key, agent); drawWorking(); }
+function workEnd(key) { if (working.delete(key)) drawWorking(); }
 function drawWorking() {
   const first = working.values().next().value;
-  document.querySelector("header").classList.toggle("busy", !!first);
-  $("working").classList.toggle("many", working.size > 1);
-  if (first) document.querySelector("header").style.setProperty("--beam", `var(--${first.agent})`);
-  if (first && !workTimer) workTimer = setInterval(tickWorking, 1000);
-  if (!first && workTimer) { clearInterval(workTimer); workTimer = null; }
-  tickWorking();
-}
-function tickWorking() {
-  for (const w of working.values()) w.time.textContent = clock(Math.floor((Date.now() - w.started) / 1000));
+  document.body.classList.toggle("busy", !!first);
+  if (first) document.body.style.setProperty("--work-color", `var(--${first})`);
 }
 
 window.onEvents = events => {
@@ -723,16 +675,14 @@ window.onEvents = events => {
       const acts = document.createElement("div"); acts.className = "acts";
       parts.b.append(text, acts);
       runs.set(e.id, {parts, st, text, acts, buf: ""});
-      workStart(e.id, e.agent, S.agents[e.agent].label, () => runs.get(e.id)?.parts.b);
+      workStart(e.id, e.agent);
     } else if (e.t === "delta") {
       const r = runs.get(e.id); if (!r) continue;
       r.buf += e.text; r.text.innerHTML = markdown(r.buf);
-      workAct(e.id, "pisze odpowiedź…");
       r.text.classList.remove("typing");
     } else if (e.t === "activity") {
       const r = runs.get(e.id); if (!r) continue;
       addLine(r.acts, "", "› " + e.text);
-      workAct(e.id, e.text);
       while (r.acts.children.length > 6) r.acts.firstChild.remove();
     } else if (e.t === "end") {
       const r = runs.get(e.id); if (!r) continue;
@@ -756,7 +706,7 @@ window.onEvents = events => {
       refreshSetup();
     } else if (e.t === "p_start") {
       setPrompter(true, `Prompter (${S.agents[e.engine].label}) pracuje…`);
-      workStart("prompter", "prompter", "Prompter", () => $("input"));
+      workStart("prompter", "prompter");
     } else if (e.t === "p_end") {
       workEnd("prompter");
       if (e.ok) {
