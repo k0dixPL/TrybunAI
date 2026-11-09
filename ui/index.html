@@ -18,12 +18,7 @@ select,input[type=text]{background:var(--panel2);border:1px solid var(--line);bo
 :focus-visible{outline:2px solid #7a8499;outline-offset:1px}
 header{display:flex;gap:9px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{font-size:15px}
-body::after{content:"";position:fixed;inset:0;z-index:10;pointer-events:none;opacity:0;
-  background:radial-gradient(ellipse 120% 38% at center,color-mix(in srgb,var(--work-color,var(--claude)) 24%,transparent),transparent 72%);
-  transition:opacity .6s ease}
-body.busy::after{opacity:1;animation:aiGlow 2.2s ease-in-out infinite alternate}
-@keyframes aiGlow{from{opacity:.35}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){body.busy::after{animation:none;opacity:.65;transition:none}}
+@keyframes bubbleGlow{from{opacity:.3;transform:scale(.995)}to{opacity:.85;transform:scale(1.012)}}
 #statsimport{color:var(--dim);font-size:13px;margin:-4px 0 10px}
 #statsimport:empty{display:none}
 header img{height:30px;width:30px}
@@ -33,7 +28,13 @@ header img{height:30px;width:30px}
 .wrap{max-width:860px;margin:0 auto}
 .empty{color:var(--dim);text-align:center;margin-top:13vh}
 .empty code{color:var(--text)}
-.msg{margin-bottom:15px;padding:9px 13px;border-radius:9px;background:var(--panel);border-left:3px solid var(--line);overflow-wrap:anywhere}
+.msg{position:relative;isolation:isolate;margin-bottom:15px;padding:9px 13px;border-radius:9px;background:var(--panel);border-left:3px solid var(--line);overflow-wrap:anywhere}
+.msg::before{content:"";position:absolute;inset:-9px;z-index:0;border-radius:17px;pointer-events:none;opacity:0;filter:blur(9px);
+  background:radial-gradient(ellipse 30% 110% at 0% 50%,color-mix(in srgb,var(--work-color,var(--claude)) 48%,transparent),transparent 100%),
+    radial-gradient(ellipse 30% 110% at 100% 50%,color-mix(in srgb,var(--work-color,var(--claude)) 48%,transparent),transparent 100%)}
+.msg.working::before{opacity:.7;animation:bubbleGlow 1.8s ease-in-out infinite alternate}
+.msg>*{position:relative;z-index:1}
+@media (prefers-reduced-motion:reduce){.msg.working::before{animation:none;opacity:.55}}
 .msg.user{background:var(--panel2)}
 .msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.gemini{border-left-color:var(--gemini)}.msg.haiku{border-left-color:var(--haiku)}.msg.antigravity{border-left-color:var(--antigravity)}
 .who{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin-bottom:3px}
@@ -654,12 +655,14 @@ function drawChips() {
 
 // ---- model activity glow ---------------------------------------------------
 const working = new Map();  // run id -> agent id
-function workStart(key, agent) { working.set(key, agent); drawWorking(); }
-function workEnd(key) { if (working.delete(key)) drawWorking(); }
-function drawWorking() {
-  const first = working.values().next().value;
-  document.body.classList.toggle("busy", !!first);
-  if (first) document.body.style.setProperty("--work-color", `var(--${first})`);
+function workStart(key, agent, message) {
+  working.set(key, {agent, message});
+  if (message) { message.style.setProperty("--work-color", `var(--${agent})`); message.classList.add("working"); }
+}
+function workEnd(key) {
+  const run = working.get(key); if (!run) return;
+  working.delete(key);
+  run.message?.classList.remove("working");
 }
 
 window.onEvents = events => {
@@ -675,7 +678,7 @@ window.onEvents = events => {
       const acts = document.createElement("div"); acts.className = "acts";
       parts.b.append(text, acts);
       runs.set(e.id, {parts, st, text, acts, buf: ""});
-      workStart(e.id, e.agent);
+      workStart(e.id, e.agent, parts.m);
     } else if (e.t === "delta") {
       const r = runs.get(e.id); if (!r) continue;
       r.buf += e.text; r.text.innerHTML = markdown(r.buf);
@@ -706,7 +709,6 @@ window.onEvents = events => {
       refreshSetup();
     } else if (e.t === "p_start") {
       setPrompter(true, `Prompter (${S.agents[e.engine].label}) pracuje…`);
-      workStart("prompter", "prompter");
     } else if (e.t === "p_end") {
       workEnd("prompter");
       if (e.ok) {

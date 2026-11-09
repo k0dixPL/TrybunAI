@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.0.20 — 2026-11-09
+- Poświata pracy pulsuje teraz po bokach aktywnego dymka, za jego treścią, zamiast na środku okna.
+- W trybie ograniczonego ruchu pozostaje widoczna jako stała poświata.
+
 ## 1.0.19 — 2026-11-09
 - Poświata pracy modelu jest jaśniejsza, pulsuje szybciej i ma kształt szerokiego, płaskiego pasa
   światła przez środek okna (jak horyzont).
