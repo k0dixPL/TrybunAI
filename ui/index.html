@@ -19,9 +19,9 @@ select,input[type=text]{background:var(--panel2);border:1px solid var(--line);bo
 header{display:flex;gap:9px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{font-size:15px}
 body::after{content:"";position:fixed;inset:0;z-index:10;pointer-events:none;opacity:0;
-  background:radial-gradient(ellipse at center,color-mix(in srgb,var(--work-color,var(--claude)) 13%,transparent),transparent 75%);
-  transition:opacity .7s ease}
-body.busy::after{opacity:1;animation:aiGlow 3.2s ease-in-out infinite alternate}
+  background:radial-gradient(ellipse 120% 38% at center,color-mix(in srgb,var(--work-color,var(--claude)) 24%,transparent),transparent 72%);
+  transition:opacity .6s ease}
+body.busy::after{opacity:1;animation:aiGlow 2.2s ease-in-out infinite alternate}
 @keyframes aiGlow{from{opacity:.35}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){body.busy::after{animation:none;opacity:.65;transition:none}}
 #statsimport{color:var(--dim);font-size:13px;margin:-4px 0 10px}

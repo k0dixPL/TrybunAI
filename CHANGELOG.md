@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.0.19 — 2026-11-09
+- Poświata pracy modelu jest jaśniejsza, pulsuje szybciej i ma kształt szerokiego, płaskiego pasa
+  światła przez środek okna (jak horyzont).
+
 ## 1.0.18 — 2026-11-09
 - Usunięto animowany pasek pracy z nagłówka. Podczas pracy modelu całe okno delikatnie pulsuje
   poświatą w kolorze aktywnego modelu; efekt respektuje ustawienie ograniczonego ruchu.
