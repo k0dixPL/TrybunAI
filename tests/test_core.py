@@ -488,6 +488,32 @@ class Runs(unittest.TestCase):
         self.assertLess(time.time() - started, 15)
         self.assertEqual(self.session.messages[-1]["status"], "stopped")
 
+    def test_stop_after_process_ended_does_not_kill_next_reply(self):
+        def late_stop(*args, **kwargs):  # the process has ended, the agent is still busy
+            self.session.stop("gemini")
+            return []
+
+        with mock.patch.object(self.session, "_collect_images", side_effect=late_stop):
+            self.session.send("@gemini pierwsze", "claude")
+            self.wait_idle()
+        self.assertEqual(self.session.messages[-1]["status"], "ok")
+        self.session.send("@gemini drugie", "claude")
+        self.wait_idle()
+        self.assertEqual(self.session.messages[-1]["status"], "ok")
+        self.assertEqual(self.session.messages[-1]["text"], "odp zażółć")
+
+    def test_corrupt_chat_is_kept_aside_and_chat_starts_empty(self):
+        folder = self.dir / ".trybunai"
+        folder.mkdir(exist_ok=True)
+        (folder / "chat.json").write_text("{nie json", encoding="utf-8")
+        session = Session(self.dir, self.events.append, binaries={"gemini": "x"})
+        self.addCleanup(session.shutdown)
+        self.assertEqual(session.messages, [])
+        kept = list(folder.glob("chat-uszkodzony-*.json"))
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(kept[0].read_text(encoding="utf-8"), "{nie json")
+        self.assertFalse((folder / "chat.json").exists())
+
     def test_second_send_while_busy_refused(self):
         self.session.send("@gemini ZAWIS", "claude")
         self.assertFalse(self.session.send("@gemini znowu", "claude")["ok"])

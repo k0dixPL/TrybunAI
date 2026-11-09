@@ -58,8 +58,8 @@ class Bridge:
             if self.window:
                 try:
                     self.window.evaluate_js(f"window.onEvents({json.dumps(batch)})")
-                except Exception:  # window is closing
-                    return
+                except Exception:  # one bad event or a closing window: keep the pump alive for the rest
+                    continue
 
 
 class Api:

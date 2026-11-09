@@ -396,7 +396,18 @@ class Session:
         self.settings = {"modes": {}, "target": "claude", "prompter": "haiku", "models": {},
                          "everyone": default_everyone(), "map": True, "map_exclude": list(mapa.DEFAULT_EXCLUDE)}
         if self._state_path.exists():
-            data = json.loads(self._state_path.read_text(encoding="utf-8"))
+            try:
+                data = json.loads(self._state_path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("chat.json is not an object")
+            except (ValueError, OSError):
+                # Keep the damaged file aside: the next save() would otherwise overwrite it with an empty chat.
+                stamp = time.strftime("%Y%m%d-%H%M%S")
+                try:
+                    os.replace(self._state_path, self._state_path.with_name(f"chat-uszkodzony-{stamp}.json"))
+                except OSError:
+                    pass
+                data = {}
             self.messages = data.get("messages", [])
             self.sessions = data.get("sessions", {})
             self.settings.update(data.get("settings", {}))
@@ -871,6 +882,7 @@ class Session:
                 self._map_workers = [w for w in self._map_workers if w.is_alive()] + [worker]
             if not keep_busy and not refresh:
                 self._busy.discard(agent)
+                self._stop_requested.discard(agent)  # a Stop after the process ended must not reach the next reply
         self.emit({"t": "end", "id": run_id, "agent": agent, "message": msg})
         if refresh:  # the agent stays busy until its session is replaced
             threading.Thread(target=self._refresh_sessions, args=([agent], True), daemon=True).start()
@@ -1013,6 +1025,7 @@ class Session:
                     reset.append(agent)
                 self.save()
             self._busy.difference_update(agents)
+            self._stop_requested.difference_update(agents)
         if error:
             text = f"Nie udało się zaktualizować pamięci projektu: {error}"
             text += " Sesję odświeżono bez niej." if reset else " Sesja zostaje bez zmian."
