@@ -329,6 +329,7 @@ class Session:
         self._memory_lock = threading.Lock()
         self._map_lock = threading.Lock()
         self._map_workers = []
+        self._stats_lock = threading.Lock()
         self._procs = {}
         self._busy = set()
         self._stop_requested = set()
@@ -1073,7 +1074,14 @@ class Session:
             pass
 
     def token_stats(self, range_key="7d"):
-        return stats.summarize(self.project / STATE_DIR, range_key)
+        folder = self.project / STATE_DIR
+        imported = None
+        with self._stats_lock:  # the first opening copies the older history from the CLIs' own logs
+            try:
+                imported = stats.backfill(folder, self.project)
+            except OSError:
+                pass
+        return {**stats.summarize(folder, range_key), "imported": imported}
 
     def _execute_inner(self, key, agent, cmd, prompt, run_id, result):
         env = {k: v for k, v in os.environ.items() if k not in _STRIP_ENV}

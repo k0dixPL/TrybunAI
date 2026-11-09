@@ -1,5 +1,14 @@
 # Zmiany
 
+## 1.0.16 — 2026-11-09
+- Na górnym pasku widać, kto teraz pracuje: świecąca pigułka w kolorze modelu z czasem pracy i bieżącą
+  czynnością (np. „Edit: ui/index.html”), a pod paskiem przesuwa się smuga światła. Kliknięcie przewija
+  do odpowiedzi. Przy kilku modelach naraz pigułki są krótsze, czynność jest w dymku.
+- Statystyki obejmują też czas przed wersją 1.0.15: przy pierwszym otwarciu dołączana jest historia
+  do 90 dni wstecz z dzienników sesji Claude/Haiku i Codexa (tylko uruchomienia z TrybunAI w tym
+  folderze, bez rozmów prowadzonych poza nim). Antigravity takich danych nie zapisuje.
+- Nowy zrzut ekranu w README.
+
 ## 1.0.15 — 2026-11-08
 - Statystyki (przycisk na górze): zużycie tokenów w czasie na wykresie słupkowym z podziałem na modele,
   za 24 godziny (co godzinę), 7, 30 albo 90 dni (co dzień). Do wyboru: nowe wejście + wyjście, wszystko

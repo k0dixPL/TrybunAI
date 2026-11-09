@@ -1,6 +1,7 @@
 """Offline tests. Real CLIs are replaced by a small script speaking each JSONL dialect."""
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -252,6 +253,50 @@ class Pure(unittest.TestCase):
             self.assertEqual(day["buckets"][-7]["by"]["claude"]["output"], 1, "09:59 lands in the 09:00 bucket")
             self.assertNotIn("codex", day["totals"])
             self.assertEqual(stats.summarize(tmp, "zły")["range"], "7d")
+
+    def test_history_is_imported_once_from_the_clis_own_logs(self):
+        from datetime import datetime, timezone
+        iso = lambda ts: datetime.fromtimestamp(ts, timezone.utc).isoformat().replace("+00:00", "Z")
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp); project = tmp / "moj projekt"; data = project / ".trybunai"
+            now = time.time(); t = now - 3600
+            claude = tmp / "claude"; folder = claude / re.sub(r"[^A-Za-z0-9]", "-", str(project)); folder.mkdir(parents=True)
+            usage = {"input_tokens": 3, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 1000, "output_tokens": 7}
+            def call(mid, ts, model="claude-opus-5-5", entry="sdk-cli", out=7):
+                return {"type": "assistant", "entrypoint": entry, "isSidechain": False, "timestamp": iso(ts),
+                        "message": {"id": mid, "model": model, "usage": {**usage, "output_tokens": out}}}
+            user = lambda ts, entry="sdk-cli": {"type": "user", "entrypoint": entry, "timestamp": iso(ts),
+                                                "message": {"content": "zrób to"}}
+            tool = {"type": "user", "entrypoint": "sdk-cli", "message": {"content": [{"type": "tool_result"}]}}
+            lines = [user(t), call("a", t, out=2), call("a", t, out=7), tool, call("b", t + 5),  # one run, two calls
+                     user(t + 60), call("c", t + 61, model="claude-haiku-5-5"),
+                     user(t + 90, "claude-desktop"), call("d", t + 91, entry="claude-desktop"),  # the user's own chat
+                     {"type": "assistant", "entrypoint": "sdk-cli", "isSidechain": True, "timestamp": iso(t),
+                      "message": {"id": "e", "model": "x", "usage": usage}}, "zepsuta linia"]
+            (folder / "s1.jsonl").write_text("\n".join(json.dumps(l) if isinstance(l, dict) else l for l in lines),
+                                             encoding="utf-8")
+            codex = tmp / "codex"; day = datetime.fromtimestamp(t)
+            cdir = codex / f"{day:%Y}" / f"{day:%m}" / f"{day:%d}"; cdir.mkdir(parents=True)
+            count = lambda total, last: {"timestamp": iso(t), "type": "event_msg", "payload": {"type": "token_count", "info": {
+                "total_token_usage": {"input_tokens": total}, "last_token_usage": {"input_tokens": last,
+                                                                                  "cached_input_tokens": 40, "output_tokens": 5}}}}
+            meta = lambda cwd, origin="codex_exec": {"type": "session_meta", "payload": {"cwd": cwd, "originator": origin}}
+            rows = [meta(str(project)), {"type": "event_msg", "payload": {"type": "task_started"}},
+                    count(100, 100), count(100, 100), count(250, 150)]
+            (cdir / "rollout-1.jsonl").write_text("\n".join(map(json.dumps, rows)), encoding="utf-8")
+            (cdir / "rollout-2.jsonl").write_text("\n".join(map(json.dumps, [meta(str(tmp)), count(1, 1)])), encoding="utf-8")
+            (cdir / "rollout-3.jsonl").write_text("\n".join(map(json.dumps, [meta(str(project), "codex_tui"), count(1, 1)])),
+                                                  encoding="utf-8")
+            stats.record(data, "claude", None, "czat", {"input": 1, "cached": 0, "output": 1}, 1, now - 60)
+            self.assertEqual(stats.backfill(data, project, now, claude, codex), 3)
+            rows = sorted(((r["agent"], r["calls"], r["input"], r["cached"], r["output"])
+                           for r in stats.read(data) if r["kind"] == "historia"))
+            self.assertEqual(rows, [("claude", 2, 206, 2000, 14), ("codex", 2, 170, 80, 10), ("haiku", 1, 103, 1000, 7)])
+            self.assertIsNone(stats.backfill(data, project, now, claude, codex), "imported once")
+            later = tmp / "pozniej" / ".trybunai"
+            stats.record(later, "claude", None, "czat", {"input": 1, "cached": 0, "output": 1}, 1, t - 10)
+            self.assertEqual(stats.backfill(later, project, now, claude, codex), 0,
+                             "nothing after the first recorded run is imported again")
 
     def test_update_check_and_safe_swap(self):
         import hashlib, io

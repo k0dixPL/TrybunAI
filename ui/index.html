@@ -18,6 +18,36 @@ select,input[type=text]{background:var(--panel2);border:1px solid var(--line);bo
 :focus-visible{outline:2px solid #7a8499;outline-offset:1px}
 header{display:flex;gap:9px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{font-size:15px}
+header{position:relative}
+header::after{content:"";position:absolute;bottom:-1px;left:-30%;width:30%;height:2px;opacity:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--beam,var(--claude)),transparent);transition:opacity .4s}
+header.busy::after{opacity:1;animation:beam 1.8s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes beam{from{left:-30%}to{left:100%}}
+#working{display:flex;gap:7px;min-width:0;flex-shrink:1;overflow:hidden}
+#working:empty{display:none}
+.wk{--c:var(--dim);position:relative;display:flex;align-items:center;gap:7px;flex-shrink:1;min-width:0;max-width:330px;
+  padding:4px 11px 4px 8px;border-radius:999px;font-size:13px;white-space:nowrap;overflow:hidden;cursor:pointer;
+  color:var(--text);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);
+  background:color-mix(in srgb,var(--c) 11%,transparent);box-shadow:0 0 14px -4px var(--c)}
+.wk::after{content:"";position:absolute;inset:0;pointer-events:none;transform:translateX(-100%);
+  background:linear-gradient(100deg,transparent 25%,color-mix(in srgb,var(--c) 30%,transparent) 50%,transparent 75%);
+  animation:scan 2.4s ease-in-out infinite}
+@keyframes scan{to{transform:translateX(100%)}}
+.wk .orb{position:relative;width:14px;height:14px;flex:none}
+.wk .orb::before{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--c);box-shadow:0 0 7px 1px var(--c);
+  animation:pulse 1.3s ease-in-out infinite}
+.wk .orb::after{content:"";position:absolute;inset:0;border-radius:50%;border:1.5px solid transparent;
+  border-top-color:var(--c);border-left-color:var(--c);animation:spin .9s linear infinite}
+@keyframes pulse{50%{transform:scale(.6);opacity:.65}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wk b{color:var(--c);font-weight:600}
+.wk .tm{font-variant-numeric:tabular-nums;color:var(--dim)}
+.wk .ac{color:var(--dim);overflow:hidden;text-overflow:ellipsis;min-width:0}
+#working.many .ac{display:none}
+#working.many .wk{flex-shrink:0}
+@media (prefers-reduced-motion:reduce){header.busy::after,.wk::after,.wk .orb::before,.wk .orb::after{animation:none}}
+#statsimport{color:var(--dim);font-size:13px;margin:-4px 0 10px}
+#statsimport:empty{display:none}
 header img{height:30px;width:30px}
 .empty img{display:block;width:160px;height:160px;margin:0 auto 14px}
 #project{flex:1;min-width:0;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dim);background:none;border-color:transparent}
@@ -183,6 +213,7 @@ dialog input#mapexclude{width:250px}
   <img class="logo" alt="" width="30" height="30">
   <b>TrybunAI</b>
   <button id="project" title="Zmień folder projektu"></button>
+  <div id="working" aria-live="polite"></div>
   <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
   <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
@@ -244,7 +275,8 @@ dialog input#mapexclude{width:250px}
     <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
     <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
     <p><b>Mapa</b> (na górze) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
-    <p><b>Statystyki</b> (na górze) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”.</p>
+    <p><b>Statystyki</b> (na górze) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”; wcześniejsza historia jest dołączana z dzienników Claude i Codexa.</p>
+    <p>Gdy model pracuje, na górnym pasku świeci jego pigułka z czasem pracy i bieżącą czynnością. Kliknięcie przewija do jego odpowiedzi.</p>
     <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
     <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu oraz plany i limity kont. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
   </div>
@@ -292,11 +324,12 @@ dialog input#mapexclude{width:250px}
     </select>
   </div>
   <div id="statshero"></div>
+  <div id="statsimport"></div>
   <div id="statschart"><div id="statstip" hidden></div></div>
   <div id="statslegend"></div>
-  <div id="statsempty" hidden>Brak danych w tym okresie. Statystyki zbierają się od wersji 1.0.15 po każdej odpowiedzi modelu.</div>
+  <div id="statsempty" hidden>Brak danych w tym okresie. Statystyki zapisują się po każdej odpowiedzi modelu; przy pierwszym otwarciu dołączana jest wcześniejsza historia z dzienników Claude i Codexa.</div>
   <table id="statstable"></table>
-  <small>Nowe wejście to tekst, który model czyta pierwszy raz (prompt, pliki, wyniki narzędzi). Odczyt z cache to powtórnie czytany początek sesji: bywa go setki tysięcy na krok, ale jest dużo tańszy i słabiej obciąża limity. Wyjście to tekst napisany przez model. Codex podaje sumę na całą turę, Antigravity tylko dla części kroków. Dane leżą w <code>.trybunai/tokeny.jsonl</code> i przetrwają „Nową rozmowę”.</small>
+  <small>Nowe wejście to tekst, który model czyta pierwszy raz (prompt, pliki, wyniki narzędzi). Odczyt z cache to powtórnie czytany początek sesji: bywa go setki tysięcy na krok, ale jest dużo tańszy i słabiej obciąża limity. Wyjście to tekst napisany przez model. Codex podaje sumę na całą turę, Antigravity tylko dla części kroków. Dane leżą w <code>.trybunai/tokeny.jsonl</code> i przetrwają „Nową rozmowę”. Wcześniejsza historia (do 90 dni) pochodzi z dzienników sesji Claude i Codexa: tylko uruchomienia z TrybunAI, bez Twoich rozmów prowadzonych poza nim.</small>
   <menu><button id="statsclose" type="button">Zamknij</button></menu>
 </dialog>
 <dialog id="dlg"><form method="dialog">
@@ -540,6 +573,41 @@ function drawChips() {
   }
 }
 
+// ---- "pracuje" pills on the top bar --------------------------------------
+const working = new Map();  // run id -> {pill, started, time, act}
+let workTimer = null;
+const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+function workStart(key, agent, name, target) {
+  const pill = document.createElement("div"); pill.className = "wk"; pill.style.setProperty("--c", `var(--${agent})`);
+  pill.title = `${name} pracuje. Kliknij, żeby przewinąć do odpowiedzi.`;
+  const orb = document.createElement("span"); orb.className = "orb";
+  const who = document.createElement("b"); who.textContent = name;
+  const time = document.createElement("span"); time.className = "tm"; time.textContent = "0:00";
+  const act = document.createElement("span"); act.className = "ac"; act.textContent = "myśli…";
+  pill.append(orb, who, time, act);
+  pill.onclick = () => target?.()?.scrollIntoView({behavior: "smooth", block: "end"});
+  $("working").append(pill);
+  working.set(key, {pill, started: Date.now(), time, act, agent});
+  drawWorking();
+}
+function workAct(key, text) {
+  const w = working.get(key); if (!w) return;
+  w.act.textContent = text; w.pill.title = `${w.pill.querySelector("b").textContent}: ${text}`;
+}
+function workEnd(key) { const w = working.get(key); if (!w) return; w.pill.remove(); working.delete(key); drawWorking(); }
+function drawWorking() {
+  const first = working.values().next().value;
+  document.querySelector("header").classList.toggle("busy", !!first);
+  $("working").classList.toggle("many", working.size > 1);
+  if (first) document.querySelector("header").style.setProperty("--beam", `var(--${first.agent})`);
+  if (first && !workTimer) workTimer = setInterval(tickWorking, 1000);
+  if (!first && workTimer) { clearInterval(workTimer); workTimer = null; }
+  tickWorking();
+}
+function tickWorking() {
+  for (const w of working.values()) w.time.textContent = clock(Math.floor((Date.now() - w.started) / 1000));
+}
+
 window.onEvents = events => {
   let stick = nearBottom();
   for (const e of events) {
@@ -553,18 +621,21 @@ window.onEvents = events => {
       const acts = document.createElement("div"); acts.className = "acts";
       parts.b.append(text, acts);
       runs.set(e.id, {parts, st, text, acts, buf: ""});
+      workStart(e.id, e.agent, S.agents[e.agent].label, () => runs.get(e.id)?.parts.b);
     } else if (e.t === "delta") {
       const r = runs.get(e.id); if (!r) continue;
       r.buf += e.text; r.text.innerHTML = markdown(r.buf);
+      workAct(e.id, "pisze odpowiedź…");
       r.text.classList.remove("typing");
     } else if (e.t === "activity") {
       const r = runs.get(e.id); if (!r) continue;
       addLine(r.acts, "", "› " + e.text);
+      workAct(e.id, e.text);
       while (r.acts.children.length > 6) r.acts.firstChild.remove();
     } else if (e.t === "end") {
       const r = runs.get(e.id); if (!r) continue;
       if (e.message.status !== "error" && !S.live_sessions.includes(e.agent)) S.live_sessions.push(e.agent);
-      r.st.remove(); finish(r.parts, e.message); runs.delete(e.id);
+      r.st.remove(); finish(r.parts, e.message); runs.delete(e.id); workEnd(e.id);
     } else if (e.t === "debate_end" || e.t === "note") {
       addLine($("items"), "note", e.text);
     } else if (e.t === "fresh") {
@@ -581,7 +652,9 @@ window.onEvents = events => {
       refreshSetup();
     } else if (e.t === "p_start") {
       setPrompter(true, `Prompter (${S.agents[e.engine].label}) pracuje…`);
+      workStart("prompter", "prompter", "Prompter", () => $("input"));
     } else if (e.t === "p_end") {
+      workEnd("prompter");
       if (e.ok) {
         $("input").value = e.text; grow();
         setPrompter(false, "Gotowy prompt jest w polu poniżej: popraw go, jeśli chcesz, i wyślij.");
@@ -744,6 +817,8 @@ function niceStep(v) {  // a round grid step (1, 2 or 5 × 10^n) giving about fo
 async function showStats() {
   document.querySelectorAll("#statsrange button").forEach(b => b.classList.toggle("on", b.dataset.r === statsRange));
   statsData = await api.token_stats(statsRange);
+  if (statsData.imported) $("statsimport").textContent = `Dołączono ${statsData.imported} wcześniejszych uruchomień ` +
+    "z dzienników Claude i Codexa (sprzed wersji 1.0.15, do 90 dni wstecz). Antigravity nie zapisuje takich danych.";
   drawStats();
 }
 function drawStats() {
