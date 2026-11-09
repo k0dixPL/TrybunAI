@@ -6,7 +6,8 @@
 <title>TrybunAI</title>
 <style>
 :root{--bg:#14161a;--panel:#1c1f25;--panel2:#252932;--line:#323742;--text:#e6e8ec;--dim:#969cab;
---claude:#e08a5f;--codex:#4fbf8f;--gemini:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--antigravity:#e874b0;--danger:#e5676b}
+--claude:#e08a5f;--codex:#4fbf8f;--gemini:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--antigravity:#e874b0;--danger:#e5676b;
+--accent:#3d6fd1;--ok:#5cc98a;--warn:#e8a93a;--on-status:#14161a}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--text);font:14.5px/1.55 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
@@ -18,6 +19,45 @@ select,input[type=text]{background:var(--panel2);border:1px solid var(--line);bo
 :focus-visible{outline:2px solid #7a8499;outline-offset:1px}
 header{display:flex;gap:9px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{font-size:15px}
+#working{display:flex;gap:7px;min-width:0;flex-shrink:1;overflow:hidden;padding:4px 3px}
+#working:empty{display:none}
+@property --orbit{syntax:"<angle>";inherits:false;initial-value:0deg}
+.wk{--c:var(--dim);position:relative;display:flex;align-items:center;flex-shrink:1;min-width:0;max-width:340px;
+  border-radius:999px;border:1.5px solid transparent;overflow:hidden;
+  background:linear-gradient(color-mix(in srgb,var(--c) 13%,var(--panel)),color-mix(in srgb,var(--c) 13%,var(--panel))) padding-box,
+    conic-gradient(from var(--orbit),color-mix(in srgb,var(--c) 22%,transparent),var(--c) 50deg,#fff 62deg,var(--c) 74deg,
+      color-mix(in srgb,var(--c) 22%,transparent) 140deg,color-mix(in srgb,var(--c) 22%,transparent)) border-box;
+  box-shadow:0 0 18px -6px var(--c);animation:wkin .5s cubic-bezier(.2,.9,.3,1.35) both,wkorbit 2.4s linear infinite}
+@keyframes wkorbit{to{--orbit:360deg}}
+@keyframes wkin{from{opacity:0;transform:translateY(-9px) scale(.8);filter:blur(5px);box-shadow:0 0 30px 6px var(--c)}}
+.wk.out{animation:wkout .3s ease-in forwards}
+@keyframes wkout{to{opacity:0;transform:scale(.8);filter:blur(4px)}}
+.wk::after{content:"";position:absolute;inset:0;pointer-events:none;transform:translateX(-110%);
+  background:linear-gradient(105deg,transparent 30%,color-mix(in srgb,var(--c) 32%,transparent) 50%,transparent 70%);
+  animation:wkscan 2.8s ease-in-out .6s infinite}
+@keyframes wkscan{to{transform:translateX(110%)}}
+.wk button{background:none;border:0;border-radius:999px;color:var(--text);font-size:13px}
+.wkgo{display:flex;align-items:center;gap:7px;min-width:0;padding:4px 4px 4px 8px;white-space:nowrap}
+.wkstop{flex:none;padding:3px 9px 3px 5px;color:var(--dim)!important;opacity:.7}
+.wkstop:hover{opacity:1;color:var(--danger)!important}
+.wk .orb{position:relative;width:14px;height:14px;flex:none}
+.wk .orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(transparent,var(--c));
+  -webkit-mask:radial-gradient(circle,transparent 4.4px,#000 5px);mask:radial-gradient(circle,transparent 4.4px,#000 5px);
+  animation:wkspin .8s linear infinite}
+.wk .orb::after{content:"";position:absolute;inset:4.5px;border-radius:50%;background:var(--c);box-shadow:0 0 8px 2px var(--c);
+  animation:wkpulse 1.2s ease-in-out infinite}
+@keyframes wkspin{to{transform:rotate(360deg)}}
+@keyframes wkpulse{50%{transform:scale(.55);opacity:.6}}
+.wk b{color:var(--c);font-weight:600}
+.wk .tm{font-variant-numeric:tabular-nums;color:var(--dim)}
+.wk .ac{color:var(--dim);overflow:hidden;text-overflow:ellipsis;min-width:0}
+header button{flex-shrink:0;white-space:nowrap}
+header #project{flex-shrink:1}
+#working.many .ac,#working.many .tm{display:none}
+#working.many .wkstop{display:none}
+#working.many .wk:hover .wkstop,#working.many .wk:focus-within .wkstop{display:block}
+#working.many .wk{flex-shrink:0}
+@media (prefers-reduced-motion:reduce){.wk,.wk::after,.wk .orb::before,.wk .orb::after{animation:none}}
 @keyframes bubbleGlow{from{opacity:.3;transform:scale(.995)}to{opacity:.85;transform:scale(1.012)}}
 #statsimport{color:var(--dim);font-size:13px;margin:-4px 0 10px}
 #statsimport:empty{display:none}
@@ -37,7 +77,7 @@ header img{height:30px;width:30px}
 @media (prefers-reduced-motion:reduce){.msg.working::before{animation:none;opacity:.55}}
 .msg.user{background:var(--panel2)}
 .msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.gemini{border-left-color:var(--gemini)}.msg.haiku{border-left-color:var(--haiku)}.msg.antigravity{border-left-color:var(--antigravity)}
-.who{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin-bottom:3px}
+.who{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--dim);margin-bottom:3px}
 .who strong.claude{color:var(--claude)}.who strong.codex{color:var(--codex)}.who strong.gemini{color:var(--gemini)}.who strong.haiku{color:var(--haiku)}.who strong.antigravity{color:var(--antigravity)}
 .who .sp{flex:1}
 .who button{padding:0 8px;font-size:12px}
@@ -53,38 +93,40 @@ header img{height:30px;width:30px}
 .code pre code{padding:0;white-space:pre}
 .code button{position:absolute;top:5px;right:5px;padding:0 7px;font-size:12px}
 .tbl{overflow-x:auto}.body table{border-collapse:collapse;margin:.5em 0}.body td,.body th{border:1px solid var(--line);padding:3px 8px}
-.err{color:var(--danger);white-space:pre-wrap;font-size:13.5px}
-.note{color:var(--dim);font-size:12.5px;font-style:italic}
+.err{color:var(--danger);white-space:pre-wrap;font-size:14.5px}
+.note{color:var(--dim);font-size:13px;font-style:italic}
 .acts{font:12px Consolas,monospace;color:var(--dim);margin-top:5px}
-.usage{margin-left:auto;font-size:11.5px}.usage.big{color:var(--haiku)}
-.verdict{font-size:11px;font-weight:600;padding:0 7px;border-radius:9px;border:1px solid}
-.verdict.accept{color:var(--codex)}.verdict.remarks{color:var(--haiku)}.verdict.unverified{color:var(--dim)}
+.usage{margin-left:auto;font-size:12px}.usage.big{color:var(--haiku)}
+.verdict{font-size:12px;font-weight:600;padding:0 8px;border-radius:9px;color:var(--on-status)}
+.verdict.accept{background:var(--ok)}.verdict.remarks{background:var(--warn)}
+.verdict.unverified{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
 .needcard{margin-top:8px;padding:8px 11px;border:1px solid var(--prompter);border-radius:8px;font-size:13px}
 .needcard ul{margin:4px 0 7px;padding-left:20px;font:12px Consolas,monospace;color:var(--dim)}
-.needcard button{border-color:var(--prompter);color:var(--prompter);font-size:12.5px}
-.propcard{margin-top:10px;padding:10px 13px;border:1px solid color-mix(in srgb,var(--haiku) 55%,transparent);border-radius:9px;
-  background:color-mix(in srgb,var(--haiku) 6%,transparent)}
-.propcard h4{margin:0 0 6px;font-size:13.5px;font-weight:600}
+.needcard button{border-color:var(--prompter);color:var(--prompter);font-size:13px}
+.propcard{margin-top:10px;padding:10px 13px;border:1px solid color-mix(in srgb,var(--accent) 65%,transparent);border-radius:9px;
+  background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.propcard h4{margin:0 0 6px;font-size:14.5px;font-weight:600}
 .propcard h4 span{color:var(--dim);font-weight:400}
 .propcard label{display:flex;gap:9px;align-items:flex-start;padding:4px 2px;cursor:pointer;border-radius:5px}
 .propcard label:hover{background:#ffffff08}
 .propcard input[type=checkbox]{margin-top:4px;flex:none}
 .propcard .no{color:var(--dim);font-size:12px;margin-left:4px}
-.propcard .sporne{color:var(--haiku);font-size:12px}
+.propcard .sporne{color:var(--warn);font-size:12px}
 .propcard textarea{width:100%;min-height:44px;margin:8px 0;resize:vertical;font:inherit;font-size:13px;
   background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 8px;box-sizing:border-box}
 .propcard .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.propcard .go{background:#3d6fd1;border-color:#3d6fd1;color:#fff}
+.propcard .go{background:var(--accent);border-color:var(--accent);color:#fff}
 .propcard .go:disabled{opacity:.5}
 .propcard .links{margin-left:auto;font-size:12px;color:var(--dim)}
-.propcard .links a{color:var(--dim);cursor:pointer;text-decoration:underline}
+.linkbtn{background:none;border:0;padding:0;color:var(--dim);text-decoration:underline;font:inherit;cursor:pointer}
+.linkbtn:hover{color:var(--text)}
 .propcard ol{margin:4px 0 6px;padding-left:22px}
 .propcard li.off{color:var(--dim);text-decoration:line-through}
-.propcard .done{color:var(--dim);font-size:12.5px}
+.propcard .done{color:var(--dim);font-size:13px}
 .needcard small{color:var(--dim);margin-left:8px;font-size:12px}
-.ctxwarn{margin-top:7px;padding:6px 9px;border:1px solid var(--haiku);border-radius:7px;font-size:12.5px;color:var(--haiku);display:flex;gap:10px;align-items:center}
+.ctxwarn{margin-top:7px;padding:6px 9px;border:1px solid var(--haiku);border-radius:7px;font-size:13px;color:var(--haiku);display:flex;gap:10px;align-items:center}
 .ctxwarn button{font-size:12px;padding:1px 9px;white-space:nowrap}
-#debatebtn{border-color:var(--haiku);color:var(--haiku);height:42px}
+#debatebtn{border-color:color-mix(in srgb,var(--accent) 75%,var(--line));height:42px}
 #debdlg textarea{width:100%;box-sizing:border-box;min-height:70px;max-height:30vh;resize:vertical}
 #debdlg input[type=number]{width:60px}
 #debdlg select{min-width:150px}
@@ -114,16 +156,16 @@ footer{background:var(--panel);border-top:1px solid var(--line);padding:9px 14px
 #setuplog:empty{display:none}
 .gallery{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .gallery img{max-width:min(100%,420px);max-height:320px;border-radius:7px;border:1px solid var(--line);cursor:zoom-in}
-.file{font-size:12.5px;color:var(--dim);margin-top:5px}
+.file{font-size:13px;color:var(--dim);margin-top:5px}
 #files{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
 #files:empty{display:none}
-#files button{font-size:12.5px;padding:1px 9px}
+#files button{font-size:13px;padding:1px 9px}
 #attach{height:42px}
 #hint{color:var(--dim);font-size:12px;margin-left:auto}
 #row{display:flex;gap:8px;align-items:flex-end}
 textarea{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;resize:none;min-height:42px;max-height:40vh}
 #refine{border-color:var(--prompter);color:var(--prompter);height:42px}
-#sendbtn{background:#3d6fd1;border-color:#3d6fd1;color:#fff;height:42px;padding:0 18px}
+#sendbtn{background:var(--accent);border-color:var(--accent);color:#fff;height:42px;padding:0 18px}
 dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:11px;width:430px}
 dialog::backdrop{background:#0009}
 dialog h3{margin:0 0 12px}
@@ -139,19 +181,21 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 .modelpick select{width:230px}.modelpick input{width:120px}
 .modelpick:has(input:not([hidden])) select{width:104px}
 #dlg{overflow-x:hidden}
-#modelsrefresh{font-size:12.5px;margin:2px 0}
+#modelsrefresh{font-size:13px;margin:2px 0}
 dialog label.rolerow{margin:-4px 0 12px;color:var(--dim);font-size:13px}
 dialog input.rolepick{width:340px}
 #aboutdlg{width:560px;max-height:90vh}
 #aboutdlg .abouthead{display:flex;gap:14px;align-items:center;margin-bottom:6px}
 #aboutdlg .abouthead h3{margin:0 0 3px}#aboutdlg .dim{color:var(--dim);font-size:13px}
 #aboutdlg a{color:var(--gemini)}
-#aboutdlg .help{font-size:13.5px;line-height:1.5}#aboutdlg .help h4{margin:12px 0 4px}
+#aboutdlg .help{font-size:14.5px;line-height:1.5}#aboutdlg .help h4{margin:12px 0 4px}
 #aboutdlg .help p{margin:5px 0}
 #updstate{margin:3px 0 6px}#updstate.new{color:var(--codex);font-weight:600}
-#updnotes{white-space:pre-wrap;font-size:12.5px;color:var(--dim);max-height:130px;overflow-y:auto;margin-bottom:7px}
+#updnotes{white-space:pre-wrap;font-size:13px;color:var(--dim);max-height:130px;overflow-y:auto;margin-bottom:7px}
 #updnotes:empty{display:none}
-#updgo{background:#3d6fd1;border-color:#3d6fd1;color:#fff}
+#updgo{background:var(--accent);border-color:var(--accent);color:#fff}
+button.ghost{background:transparent;border-color:transparent;color:var(--dim)}
+button.ghost:hover{color:var(--text);border-color:var(--line)}
 .iconbtn{min-width:36px;padding-left:9px;padding-right:9px;font-size:16px;line-height:1.2;position:relative}
 #aboutbtn{font-weight:700}
 #newdot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--codex)}
@@ -174,7 +218,7 @@ dialog input.rolepick{width:340px}
 #statschart .hit{fill:transparent;cursor:default}
 #statschart .hit:hover{fill:#ffffff0c}
 #statstip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
-  padding:7px 10px;font-size:12.5px;min-width:170px;box-shadow:0 6px 18px #0007;z-index:2}
+  padding:7px 10px;font-size:13px;min-width:170px;box-shadow:0 6px 18px #0007;z-index:2}
 #statstip .row{display:flex;align-items:center;gap:7px;justify-content:space-between}
 #statstip .row span:first-child{display:flex;align-items:center;gap:6px;color:var(--dim)}
 #statstip b{font-variant-numeric:tabular-nums;font-weight:600}
@@ -188,19 +232,19 @@ dialog input.rolepick{width:340px}
 #statstable td:first-child .sw{margin-right:7px;vertical-align:-1px}
 #statstable tr.sum td{font-weight:600;border-bottom:0}
 #statsempty{color:var(--dim);text-align:center;padding:40px 10px}
-#maplog{font-size:12.5px;color:var(--dim);max-height:20vh;overflow:auto}#maplog div{margin:2px 0}
+#maplog{font-size:13px;color:var(--dim);max-height:20vh;overflow:auto}#maplog div{margin:2px 0}
 #mapstate,#startstate{font-size:13px;margin:4px 0}
 dialog input#mapexclude{width:250px}
-#memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:12.5px;margin-top:4px}
+#memory{width:100%;box-sizing:border-box;min-height:110px;max-height:35vh;resize:vertical;font-size:13px;margin-top:4px}
 #limits .acct{margin:8px 0 10px}
-#limits .acct b{font-size:14px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
-#limits .win{margin:5px 0 0;font-size:12.5px}
+#limits .acct b{font-size:14.5px}#limits .plan{color:var(--dim);font-size:13px;margin-left:6px}
+#limits .win{margin:5px 0 0;font-size:13px}
 #limits .win .top{display:flex;justify-content:space-between;gap:10px}
 #limits .barl{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:3px}
 #limits .barl i{display:block;height:100%;background:var(--codex)}
 #limits .barl i.mid{background:var(--haiku)}#limits .barl i.high{background:var(--danger)}
 #limits small{margin-top:3px}
-#limitsrefresh{margin:2px 0 8px;font-size:12.5px}
+#limitsrefresh{margin:2px 0 8px;font-size:13px}
 #remotebtn.connecting{border-color:var(--haiku);color:var(--haiku)}
 #remotebtn.connected{border-color:var(--codex);color:var(--codex)}
 #toast{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:#4b2326;border:1px solid var(--danger);padding:6px 14px;border-radius:8px;display:none;max-width:80%;z-index:3}
@@ -211,12 +255,13 @@ dialog input#mapexclude{width:250px}
   <img class="logo" alt="" width="30" height="30">
   <b>TrybunAI</b>
   <button id="project" title="Zmień folder projektu"></button>
-  <button id="setupbtn" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
-  <button id="remotebtn" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
+  <div id="working" aria-live="polite"></div>
+  <button id="setupbtn" class="ghost" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
+  <button id="remotebtn" class="ghost" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
   <button id="settings">Ustawienia</button>
   <button id="mapbtn" title="Mapa projektu: krótkie notatki o kodzie, od których modele zaczynają">Mapa</button>
   <button id="statsbtn" title="Zużycie tokenów w czasie, z podziałem na modele">Statystyki</button>
-  <button id="newchat" class="iconbtn" title="Nowa rozmowa (zapisuje stan do pamięci projektu)" aria-label="Nowa rozmowa">📄</button>
+  <button id="newchat" title="Archiwizuje czat i zaczyna nowy (najpierw zapisuje stan do pamięci projektu)">Nowa rozmowa</button>
   <button id="aboutbtn" class="iconbtn" title="O programie i aktualizacje" aria-label="O programie">?<span id="newdot" hidden></span></button>
 </header>
 <div id="toast" role="alert"></div>
@@ -435,12 +480,13 @@ function label(agent, turn) {
   const s = document.createElement("strong");
   s.className = agent; s.textContent = S.agents[agent].label + (turn ? " · " + turn : ""); return s;
 }
+const rounds = n => n === 1 ? "runda" : (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) ? "rundy" : "rund";
 function userBubble(msg) {
   const span = document.createElement("span");
   const names = msg.targets.map(t => S.agents[t].label).join(", ");
   const order = msg.targets.map(t => S.agents[t].label).join(" → ");
   span.textContent = msg.debate
-    ? `Ty → debata, ${msg.debate} rund(y): ${order} (tylko odczyt)` +
+    ? `Ty → debata, ${msg.debate} ${rounds(msg.debate)}: ${order} (tylko odczyt)` +
       (msg.implementer ? ` · wdraża ${S.agents[msg.implementer].label}` : "")
     : "Ty → " + names + (msg.grant ? ` (jednorazowo: ${MODE_TEXT[msg.grant]})` : "");
   const parts = bubble("user", span);
@@ -559,8 +605,8 @@ function proposalCard(msg) {
   row.append(go, skip);
   if (items.length > 1) {
     const links = document.createElement("span"); links.className = "links";
-    const all = document.createElement("a"); all.textContent = "zaznacz wszystkie";
-    const none = document.createElement("a"); none.textContent = "odznacz";
+    const all = document.createElement("button"); all.type = "button"; all.className = "linkbtn"; all.textContent = "zaznacz wszystkie";
+    const none = document.createElement("button"); none.type = "button"; none.className = "linkbtn"; none.textContent = "odznacz";
     all.onclick = () => { boxes.forEach(b => b.checked = true); refresh(); };
     none.onclick = () => { boxes.forEach(b => b.checked = false); refresh(); };
     links.append(all, " · ", none); row.append(links);
@@ -568,7 +614,7 @@ function proposalCard(msg) {
   c.append(note, row); refresh();
   return c;
 }
-const VERDICT_TEXT = {accept: "AKCEPTUJĘ", remarks: "UWAGI", unverified: "NIE MÓGŁ SPRAWDZIĆ"};
+const VERDICT_TEXT = {accept: "✓ AKCEPTUJĘ", remarks: "! UWAGI", unverified: "? NIE MÓGŁ SPRAWDZIĆ"};
 function addVerdict(parts, msg) {
   if (!msg.verdict) return;
   const s = document.createElement("span"); s.className = "verdict " + msg.verdict;
@@ -653,16 +699,49 @@ function drawChips() {
   }
 }
 
-// ---- model activity glow ---------------------------------------------------
-const working = new Map();  // run id -> agent id
-function workStart(key, agent, message) {
-  working.set(key, {agent, message});
+// ---- model activity: glow on the bubble, pill on the top bar ------------------
+const working = new Map();  // run id -> {agent, message, pill, started, time, act}
+let workTimer = null;
+const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+function workStart(key, agent, message, {name, target, stop} = {}) {
   if (message) { message.style.setProperty("--work-color", `var(--${agent})`); message.classList.add("working"); }
+  const pill = document.createElement("div"); pill.className = "wk"; pill.style.setProperty("--c", `var(--${agent})`);
+  const go = document.createElement("button"); go.type = "button"; go.className = "wkgo";
+  go.title = `${name} pracuje. Kliknij, żeby przewinąć do odpowiedzi.`;
+  const orb = document.createElement("span"); orb.className = "orb";
+  const who = document.createElement("b"); who.textContent = name;
+  const time = document.createElement("span"); time.className = "tm"; time.textContent = "0:00";
+  const act = document.createElement("span"); act.className = "ac"; act.textContent = "myśli…";
+  go.append(orb, who, time, act);
+  go.onclick = () => (target || message)?.scrollIntoView({behavior: "smooth", block: "end"});
+  pill.append(go);
+  if (stop) {
+    const x = document.createElement("button"); x.type = "button"; x.className = "wkstop"; x.textContent = "✕";
+    x.title = `Zatrzymaj: ${name}`; x.setAttribute("aria-label", x.title); x.onclick = stop; pill.append(x);
+  }
+  $("working").append(pill);
+  working.set(key, {agent, message, pill, started: Date.now(), time, act, go, name});
+  drawWorking();
+}
+function workAct(key, text) {
+  const w = working.get(key); if (!w) return;
+  w.act.textContent = text; w.go.title = `${w.name}: ${text}`;
 }
 function workEnd(key) {
-  const run = working.get(key); if (!run) return;
+  const w = working.get(key); if (!w) return;
   working.delete(key);
-  run.message?.classList.remove("working");
+  w.message?.classList.remove("working");
+  w.pill.classList.add("out"); setTimeout(() => w.pill.remove(), 300);
+  drawWorking();
+}
+function drawWorking() {
+  $("working").classList.toggle("many", working.size > 1);
+  if (working.size && !workTimer) workTimer = setInterval(tickWorking, 1000);
+  if (!working.size && workTimer) { clearInterval(workTimer); workTimer = null; }
+  tickWorking();
+}
+function tickWorking() {
+  for (const w of working.values()) w.time.textContent = clock(Math.floor((Date.now() - w.started) / 1000));
 }
 
 window.onEvents = events => {
@@ -678,14 +757,16 @@ window.onEvents = events => {
       const acts = document.createElement("div"); acts.className = "acts";
       parts.b.append(text, acts);
       runs.set(e.id, {parts, st, text, acts, buf: ""});
-      workStart(e.id, e.agent, parts.m);
+      workStart(e.id, e.agent, parts.m, {name: S.agents[e.agent].label, stop: () => api.stop(e.agent)});
     } else if (e.t === "delta") {
       const r = runs.get(e.id); if (!r) continue;
       r.buf += e.text; r.text.innerHTML = markdown(r.buf);
       r.text.classList.remove("typing");
+      workAct(e.id, "pisze odpowiedź…");
     } else if (e.t === "activity") {
       const r = runs.get(e.id); if (!r) continue;
       addLine(r.acts, "", "› " + e.text);
+      workAct(e.id, e.text);
       while (r.acts.children.length > 6) r.acts.firstChild.remove();
     } else if (e.t === "end") {
       const r = runs.get(e.id); if (!r) continue;
@@ -709,6 +790,7 @@ window.onEvents = events => {
       refreshSetup();
     } else if (e.t === "p_start") {
       setPrompter(true, `Prompter (${S.agents[e.engine].label}) pracuje…`);
+      workStart("prompter", "prompter", null, {name: "Prompter", target: $("input"), stop: () => api.stop("prompter")});
     } else if (e.t === "p_end") {
       workEnd("prompter");
       if (e.ok) {
@@ -1022,7 +1104,7 @@ function showLogo() {
 async function reload() { S = await api.snapshot(); render(); drawRemote(); }
 function drawRemote() {
   const r = S.remote, on = r.state !== "off";
-  $("remotebtn").className = r.state;
+  $("remotebtn").className = "ghost " + (r.state || "");
   $("remotebtn").textContent = r.state === "connected" ? "Zdalnie: wł." : r.state === "connecting" ? "Zdalnie…" : "Zdalnie";
   $("remotestate").textContent = {off: "Wyłączone.", connecting: "Łączenie…", connected: "Połączono. Otwórz aplikację Claude i napisz."}[r.state];
   $("remoteerr").textContent = r.error || "";

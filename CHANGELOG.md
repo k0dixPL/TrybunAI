@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.0.22 — 2026-11-09
+- Wraca pigułka „pracuje” na górnym pasku, obok poświaty dymka: kolor modelu, czas pracy, bieżąca
+  czynność, światło okrążające ramkę, wejście z rozbłyskiem i wygaszenie na końcu. Kliknięcie przewija
+  do odpowiedzi, „✕” zatrzymuje model. Przy kilku modelach naraz pigułki są krótsze.
+- Pigułka i „zaznacz wszystkie / odznacz” w karcie wyboru to prawdziwe przyciski (działają z klawiatury).
+- Werdykty mają własne kolory i ikony (✓ akceptuję, ! uwagi, ? nie mógł sprawdzić), osobne od kolorów
+  modeli. Przycisk Debata i karta wyboru są w neutralnym kolorze akcentu zamiast żółtego Haiku.
+- Górny pasek: Instalacja i Zdalnie wyciszone (rzadko używane), „Nowa rozmowa” opisana słowami zamiast 📄.
+- Porządki: kolor akcentu w jednej zmiennej, mniej rozmiarów czcionek, „1 runda / 2 rundy / 5 rund”.
+
 ## 1.0.21 — 2026-11-09
 - Stop kliknięty tuż po zakończeniu odpowiedzi nie zabija już następnej odpowiedzi tego modelu.
 - Uszkodzony `chat.json` nie blokuje startu i nie kasuje historii: plik trafia do `chat-uszkodzony-*.json`, a czat startuje pusty.
