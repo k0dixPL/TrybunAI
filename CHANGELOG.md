@@ -1,5 +1,12 @@
 # Zmiany
 
+## 1.0.23 — 2026-11-09
+- Ustawienia mają zakładki: Modele, Pamięć, Mapa, Statystyki, Zdalnie i Limity. Mapa, Statystyki
+  i Zdalnie zniknęły z górnego paska i są teraz w Ustawieniach. Okno jest szersze (do 1000 px),
+  a przycisk zamknięcia (✕) jest w nagłówku, zawsze widoczny; przewija się tylko treść zakładki.
+  Zmiany zapisują się przy zamknięciu, także przez Esc. Gdy zdalne sterowanie jest włączone,
+  przycisk Ustawienia na górnym pasku jest podświetlony. Haiku nie ma już wyboru modelu, tylko rolę.
+
 ## 1.0.22 — 2026-11-09
 - Wraca pigułka „pracuje” na górnym pasku, obok poświaty dymka: kolor modelu, czas pracy, bieżąca
   czynność, światło okrążające ramkę, wejście z rozbłyskiem i wygaszenie na końcu. Kliknięcie przewija

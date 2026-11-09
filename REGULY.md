@@ -6,16 +6,18 @@ Ten plik jest jedynym źródłem wspólnych zasad. `CLAUDE.md`, `AGENTS.md` i `G
 
 Wersja jest w jednym miejscu: `trybun/__init__.py` (`__version__ = "MAJOR.MINOR.PATCH"`).
 
-- **PATCH** (trzecia liczba): zwiększ o 1 przy **każdej** zmianie w kodzie
-  (`*.py`, `ui/`, `build.ps1`, zasoby wbudowywane w exe). Jedna paczka zmian
-  w jednej odpowiedzi = jedno podbicie, nie podbijaj kilka razy w tej samej odpowiedzi.
+- **PATCH** (trzecia liczba): zwiększ o 1 **tylko w momencie wypchnięcia na git**, jednym podbiciem
+  na wypchnięcie (razem z wpisem w `CHANGELOG.md` i tagiem). Dopóki zmiany powstają lokalnie
+  i nie są wypchnięte, numer zostaje bez zmian, nawet gdy zmienia się kod
+  (`*.py`, `ui/`, `build.ps1`, zasoby wbudowywane w exe).
   Same zmiany w dokumentacji (`*.md`) nie zmieniają wersji.
 - **MAJOR.MINOR** (dwie pierwsze liczby): zmieniaj **tylko wtedy, gdy właściciel
   wprost o to poprosi** (np. „wydajemy 1.1”). Wtedy PATCH wraca do 0.
-- Po podbiciu dopisz wpis na górze `CHANGELOG.md`: wersja, data, krótko co się zmieniło.
-- W odpowiedzi podaj nową wersję, np. „Wersja: 1.0.4”.
+- Przy podbiciu dopisz wpis na górze `CHANGELOG.md`: wersja, data, krótko co się zmieniło
+  od ostatniego wypchnięcia.
+- W odpowiedzi podawaj aktualny numer; „nowa wersja” tylko przy wypchnięciu.
 
-Przykład: 1.0.3 → poprawka → 1.0.4 → kolejna → 1.0.5 → „zrób 1.1” → 1.1.0.
+Przykład: 1.0.3 → kilka lokalnych poprawek (nadal 1.0.3) → wypchnięcie → 1.0.4 → „zrób 1.1” → 1.1.0.
 
 ## Budowanie i testy
 

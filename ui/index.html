@@ -199,11 +199,24 @@ button.ghost:hover{color:var(--text);border-color:var(--line)}
 .iconbtn{min-width:36px;padding-left:9px;padding-right:9px;font-size:16px;line-height:1.2;position:relative}
 #aboutbtn{font-weight:700}
 #newdot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--codex)}
-#mapdlg{width:640px;max-height:90vh}
+#dlg{width:1000px;max-width:94vw;height:86vh;padding:0;display:none;flex-direction:column}
+#dlg[open]{display:flex}
+#dlg form{display:flex;flex-direction:column;flex:1;min-height:0}
+#dlg .sethead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+#dlg .sethead h3{margin:0}
+#dlg .setbody{display:flex;flex:1;min-height:0}
+#settabs{display:flex;flex-direction:column;gap:2px;padding:10px 8px;border-right:1px solid var(--line);min-width:150px}
+#settabs button{text-align:left;background:transparent;border-color:transparent;color:var(--dim)}
+#settabs button:hover{color:var(--text)}
+#settabs button.on{background:var(--panel2);border-color:var(--line);color:var(--text)}
+#settabs button.connecting{color:var(--haiku)}#settabs button.connected{color:var(--codex)}
+#settings.connected::after{content:" · zdalnie"}
+#setpanes{flex:1;overflow:auto;padding:12px 18px 16px}
+#setpanes h4{margin:2px 0 10px;font-size:15px}
+#setpanes label:has(select){max-width:620px}
 #mapindex{white-space:pre-wrap;font:12px/1.45 Consolas,monospace;background:var(--panel2);border-radius:6px;padding:8px 10px;max-height:42vh;overflow:auto;margin:8px 0}
 #mapindex:empty{display:none}
-#statsdlg{width:780px;max-width:94vw;max-height:92vh}
-#statsdlg .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+#statspane .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .seg button{border:0;border-radius:0;background:transparent;color:var(--dim)}
 .seg button+button{border-left:1px solid var(--line)}
@@ -245,8 +258,8 @@ dialog input#mapexclude{width:250px}
 #limits .barl i.mid{background:var(--haiku)}#limits .barl i.high{background:var(--danger)}
 #limits small{margin-top:3px}
 #limitsrefresh{margin:2px 0 8px;font-size:13px}
-#remotebtn.connecting{border-color:var(--haiku);color:var(--haiku)}
-#remotebtn.connected{border-color:var(--codex);color:var(--codex)}
+#settings.connecting{border-color:var(--haiku);color:var(--haiku)}
+#settings.connected{border-color:var(--codex);color:var(--codex)}
 #toast{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:#4b2326;border:1px solid var(--danger);padding:6px 14px;border-radius:8px;display:none;max-width:80%;z-index:3}
 </style>
 </head>
@@ -257,10 +270,7 @@ dialog input#mapexclude{width:250px}
   <button id="project" title="Zmień folder projektu"></button>
   <div id="working" aria-live="polite"></div>
   <button id="setupbtn" class="ghost" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
-  <button id="remotebtn" class="ghost" title="Steruj Claude na tym komputerze z aplikacji Claude">Zdalnie</button>
-  <button id="settings">Ustawienia</button>
-  <button id="mapbtn" title="Mapa projektu: krótkie notatki o kodzie, od których modele zaczynają">Mapa</button>
-  <button id="statsbtn" title="Zużycie tokenów w czasie, z podziałem na modele">Statystyki</button>
+  <button id="settings" title="Modele, pamięć, mapa, statystyki, zdalne sterowanie, limity">Ustawienia</button>
   <button id="newchat" title="Archiwizuje czat i zaczyna nowy (najpierw zapisuje stan do pamięci projektu)">Nowa rozmowa</button>
   <button id="aboutbtn" class="iconbtn" title="O programie i aktualizacje" aria-label="O programie">?<span id="newdot" hidden></span></button>
 </header>
@@ -293,13 +303,6 @@ dialog input#mapexclude{width:250px}
   <small id="setupnote">Program zainstaluje brakujące CLI, a potem otworzy po kolei okna logowania. Następne okno pojawi się po zamknięciu poprzedniego.</small>
   <menu style="gap:8px"><button id="setupclose" type="button">Zamknij</button><button id="setupgo" type="button">Zainstaluj i zaloguj brakujące</button></menu>
 </dialog>
-<dialog id="remotedlg">
-  <h3>Zdalne sterowanie Claude</h3>
-  <div id="remotestate" role="status"></div>
-  <div id="remoteerr" class="err"></div>
-  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex, Antigravity i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
-  <menu style="gap:8px"><button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button><button id="remoteclose" type="button">Zamknij</button><button id="remotetoggle" type="button"></button></menu>
-</dialog>
 <dialog id="aboutdlg">
   <div class="abouthead"><img class="logo" alt="" width="54" height="54"><div><h3>TrybunAI <span id="aboutver"></span></h3>
     <div class="dim">Autor: <b id="aboutauthor"></b> · licencja MIT · <a href="#" data-href="repo">GitHub</a> · <a href="#" data-href="page">strona</a></div></div></div>
@@ -316,11 +319,11 @@ dialog input#mapexclude{width:250px}
     <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem model, który ma wdrażać, pisze podsumowanie z ponumerowanymi propozycjami, a Ty zaznaczasz, co wdrożyć (punkty sporne są domyślnie odznaczone), i możesz dopisać uwagi. Dopiero wtedy wdraża wybrane punkty, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić. Bez podsumowania (wdrożenie od razu) ustawisz to w menu Debata.</p>
     <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
     <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
-    <p><b>Mapa</b> (na górze) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
-    <p><b>Statystyki</b> (na górze) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”; wcześniejsza historia jest dołączana z dzienników Claude i Codexa.</p>
+    <p><b>Mapa</b> (Ustawienia → Mapa) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
+    <p><b>Statystyki</b> (Ustawienia → Statystyki) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”; wcześniejsza historia jest dołączana z dzienników Claude i Codexa.</p>
     <p>Gdy model pracuje, na górnym pasku świeci jego pigułka z czasem pracy i bieżącą czynnością. Kliknięcie przewija do jego odpowiedzi.</p>
     <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
-    <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu oraz plany i limity kont. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
+    <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu, mapa, statystyki, zdalne sterowanie oraz plany i limity kont, każde w osobnej zakładce. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. Zakładka <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
   </div>
   <menu><button id="aboutclose" type="button">Zamknij</button></menu>
 </dialog>
@@ -340,8 +343,38 @@ dialog input#mapexclude{width:250px}
   <small id="debnote">Debata działa tylko do odczytu. Wdraża wybrany model po ostatniej rundzie, ze swoimi uprawnieniami. Sprawdzający kończą werdyktem: akceptuję, uwagi albo nie mogę sprawdzić. Przy uwagach wdrażający poprawia, najwyżej tyle razy, ile rund poprawek. Każda tura zużywa limit danego modelu.</small>
   <menu style="gap:8px"><button id="debcancel" type="button">Anuluj</button><button id="debgo" type="button">Rozpocznij</button></menu>
 </dialog>
-<dialog id="mapdlg">
-  <h3>Mapa projektu</h3>
+<dialog id="dlg"><form method="dialog">
+  <div class="sethead"><h3>Ustawienia</h3>
+    <button id="dlgok" value="ok" class="ghost iconbtn" title="Zamknij (zmiany zapisują się same; Esc też zamyka)" aria-label="Zamknij">✕</button></div>
+  <div class="setbody">
+  <nav id="settabs" role="tablist" aria-label="Sekcje ustawień">
+    <button type="button" data-tab="models" class="on">Modele</button>
+    <button type="button" data-tab="memory">Pamięć</button>
+    <button type="button" data-tab="map">Mapa</button>
+    <button type="button" data-tab="stats">Statystyki</button>
+    <button type="button" data-tab="remote" id="remotebtn">Zdalnie</button>
+    <button type="button" data-tab="limits">Limity</button>
+  </nav>
+  <div id="setpanes">
+  <section data-pane="models">
+  <label>Prompter używa <select id="engine"></select></label>
+  <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
+  <div id="models"></div>
+  <button id="modelsrefresh" type="button">Odśwież listy modeli</button>
+  <small>„Domyślny” to model, który dane CLI wybiera samo. Listy pochodzą z zainstalowanych CLI: Codex odświeża swoją przy każdym uruchomieniu, Antigravity po kliknięciu „Odśwież” (musi być zalogowany). Ustawienia są zapisywane w folderze projektu.</small>
+  </section>
+  <section data-pane="memory" hidden>
+  <h4>Pamięć projektu</h4>
+    <textarea id="memory" placeholder="Pusta. Zapełni się przy pierwszej świeżej sesji, nowej rozmowie albo po kliknięciu „Zapisz stan teraz”."></textarea>
+    <button id="savestate" type="button">Zapisz stan teraz</button> <span id="savestateerr" class="err"></span>
+    <label style="justify-content:flex-start"><input id="autofresh" type="checkbox"> Świeża sesja automatycznie, gdy kontekst modelu przekroczy 150 tys. tokenów</label>
+    <small>Nowa sesja modelu (także po „Nowa rozmowa”) dostaje tę pamięć zamiast całej historii. Aktualizuje ją model wybrany jako Prompter, na podstawie czatu: przy świeżej sesji, przy nowej rozmowie i po kliknięciu „Zapisz stan teraz” (np. przed przejściem na inny komputer). Sekcję „Nie ruszać” modele traktują jak twarde zasady. Możesz ją tu poprawić.</small>
+  </section>
+  <section data-pane="map" hidden>
+  <h4>Mapa projektu</h4>
+    <label style="justify-content:flex-start"><input id="mapon" type="checkbox"> Prowadź mapę projektu i dziennik zmian</label>
+    <label>Pomijaj katalogi <input id="mapexclude" type="text" placeholder="np. obiekty, dane/klienci"></label>
+    <small>Katalogi z danymi (oddzielone przecinkami) nie trafią do mapy ani do dziennika zmian. Zawsze pomijane są .git, .venv, node_modules, dist, build i foldery zaczynające się od kropki.</small>
   <div id="mapstate" role="status"></div>
   <button id="maprefresh" type="button">Odśwież teraz</button> <button id="mapopen" type="button">Otwórz folder mapy</button>
   <div id="mapindex"></div>
@@ -352,10 +385,9 @@ dialog input#mapexclude{width:250px}
     <small>Tworzy brakujące CLAUDE.md, AGENTS.md i GEMINI.md z odsyłaczem do REGULY.md i do mapy. Istniejących plików nie zmienia. REGULY.md piszesz sam: zasady wspólne dla wszystkich modeli.</small>
   </fieldset>
   <small>Mapa leży w <code>.trybunai/mapa</code>: INDEX.md z listą plików i notatka dla każdego modułu Pythona (publiczne funkcje i klasy, kto od kogo zależy). Nowa sesja modelu dostaje tylko wskazówkę, żeby od niej zacząć, oraz ostatnie zmiany; trwająca sesja dostaje zmiany innych modeli. Folder otworzysz jako vault w Obsidianie (graf). Sekcje „Uwagi (ręczne)” możesz uzupełniać: generator ich nie nadpisuje.</small>
-  <menu><button id="mapclose" type="button">Zamknij</button></menu>
-</dialog>
-<dialog id="statsdlg">
-  <h3>Zużycie tokenów</h3>
+  </section>
+  <section data-pane="stats" id="statspane" hidden>
+  <h4>Zużycie tokenów</h4>
   <div class="filters">
     <div class="seg" id="statsrange" role="group" aria-label="Okres">
       <button type="button" data-r="24h">24 godziny</button><button type="button" data-r="7d" class="on">7 dni</button><button type="button" data-r="30d">30 dni</button><button type="button" data-r="90d">90 dni</button>
@@ -373,31 +405,20 @@ dialog input#mapexclude{width:250px}
   <div id="statsempty" hidden>Brak danych w tym okresie. Statystyki zapisują się po każdej odpowiedzi modelu; przy pierwszym otwarciu dołączana jest wcześniejsza historia z dzienników Claude i Codexa.</div>
   <table id="statstable"></table>
   <small>Nowe wejście to tekst, który model czyta pierwszy raz (prompt, pliki, wyniki narzędzi). Odczyt z cache to powtórnie czytany początek sesji: bywa go setki tysięcy na krok, ale jest dużo tańszy i słabiej obciąża limity. Wyjście to tekst napisany przez model. Codex podaje sumę na całą turę, Antigravity tylko dla części kroków. Dane leżą w <code>.trybunai/tokeny.jsonl</code> i przetrwają „Nową rozmowę”. Wcześniejsza historia (do 90 dni) pochodzi z dzienników sesji Claude i Codexa: tylko uruchomienia z TrybunAI, bez Twoich rozmów prowadzonych poza nim.</small>
-  <menu><button id="statsclose" type="button">Zamknij</button></menu>
-</dialog>
-<dialog id="dlg"><form method="dialog">
-  <h3>Ustawienia</h3>
-  <label>Prompter używa <select id="engine"></select></label>
-  <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
-  <div id="models"></div>
-  <button id="modelsrefresh" type="button">Odśwież listy modeli</button>
-  <small>„Domyślny” to model, który dane CLI wybiera samo. Listy pochodzą z zainstalowanych CLI: Codex odświeża swoją przy każdym uruchomieniu, Antigravity po kliknięciu „Odśwież” (musi być zalogowany). Ustawienia są zapisywane w folderze projektu.</small>
-  <fieldset id="memorybox"><legend>Pamięć projektu</legend>
-    <textarea id="memory" placeholder="Pusta. Zapełni się przy pierwszej świeżej sesji, nowej rozmowie albo po kliknięciu „Zapisz stan teraz”."></textarea>
-    <button id="savestate" type="button">Zapisz stan teraz</button> <span id="savestateerr" class="err"></span>
-    <label style="justify-content:flex-start"><input id="autofresh" type="checkbox"> Świeża sesja automatycznie, gdy kontekst modelu przekroczy 150 tys. tokenów</label>
-    <small>Nowa sesja modelu (także po „Nowa rozmowa”) dostaje tę pamięć zamiast całej historii. Aktualizuje ją model wybrany jako Prompter, na podstawie czatu: przy świeżej sesji, przy nowej rozmowie i po kliknięciu „Zapisz stan teraz” (np. przed przejściem na inny komputer). Sekcję „Nie ruszać” modele traktują jak twarde zasady. Możesz ją tu poprawić.</small>
-  </fieldset>
-  <fieldset id="mapbox"><legend>Mapa projektu</legend>
-    <label style="justify-content:flex-start"><input id="mapon" type="checkbox"> Prowadź mapę projektu i dziennik zmian</label>
-    <label>Pomijaj katalogi <input id="mapexclude" type="text" placeholder="np. obiekty, dane/klienci"></label>
-    <small>Katalogi z danymi (oddzielone przecinkami) nie trafią do mapy ani do dziennika zmian. Zawsze pomijane są .git, .venv, node_modules, dist, build i foldery zaczynające się od kropki.</small>
-  </fieldset>
-  <fieldset id="limitsbox"><legend>Plany i limity</legend>
+  </section>
+  <section data-pane="remote" hidden>
+  <h4>Zdalne sterowanie Claude</h4>
+  <div id="remotestate" role="status"></div>
+  <div id="remoteerr" class="err"></div>
+  <p><button id="remotetoggle" type="button"></button> <button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button></p>
+  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex, Antigravity i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
+  </section>
+  <section data-pane="limits" hidden>
+  <h4>Plany i limity</h4>
     <div id="limits" role="status"></div>
     <button id="limitsrefresh" type="button">Odśwież</button>
-  </fieldset>
-  <menu><button id="dlgok" value="ok">Zapisz</button></menu>
+  </section>
+  </div></div>
 </form></dialog>
 <script>
 "use strict";
@@ -1102,9 +1123,18 @@ function showLogo() {
   document.querySelectorAll("img.logo").forEach(i => { i.src = logoData; });
 }
 async function reload() { S = await api.snapshot(); render(); drawRemote(); }
+function setTab(name) {
+  document.querySelectorAll("#settabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll("#setpanes section").forEach(s => s.hidden = s.dataset.pane !== name);
+  if (name === "map") { $("startstate").textContent = ""; showMap(false); }
+  if (name === "stats") showStats();
+  if (name === "limits") drawLimits();
+}
 function drawRemote() {
   const r = S.remote, on = r.state !== "off";
-  $("remotebtn").className = "ghost " + (r.state || "");
+  $("remotebtn").classList.remove("connecting", "connected");
+  if (on && r.state) $("remotebtn").classList.add(r.state);
+  $("settings").className = on && r.state ? r.state : "";  // the remote state stays visible on the top bar
   $("remotebtn").textContent = r.state === "connected" ? "Zdalnie: wł." : r.state === "connecting" ? "Zdalnie…" : "Zdalnie";
   $("remotestate").textContent = {off: "Wyłączone.", connecting: "Łączenie…", connected: "Połączono. Otwórz aplikację Claude i napisz."}[r.state];
   $("remoteerr").textContent = r.error || "";
@@ -1170,24 +1200,27 @@ const CUSTOM = "__custom__";
 function drawModelPickers() {
   const box = $("models"); box.replaceChildren();
   for (const [id, a] of shown()) {
-    const current = S.settings.models[id] || "";
-    const l = document.createElement("label"); l.textContent = "Model: " + a.label;
-    const wrap = document.createElement("span"); wrap.className = "modelpick";
-    const sel = document.createElement("select"); sel.dataset.agent = id;
-    sel.append(new Option(id === "haiku" ? "domyślny (haiku)" : "domyślny", ""));
-    for (const o of modelLists[id] || []) sel.append(new Option(o.label === o.value ? o.value : `${o.label} (${o.value})`, o.value));
-    sel.append(new Option("Inny (wpisz)…", CUSTOM));
-    const custom = document.createElement("input"); custom.type = "text"; custom.placeholder = "nazwa modelu";
-    const known = [...sel.options].some(o => o.value === current && o.value !== CUSTOM);
-    sel.value = known ? current : CUSTOM;
-    custom.value = known ? "" : current;
-    custom.hidden = sel.value !== CUSTOM;
-    sel.onchange = () => { custom.hidden = sel.value !== CUSTOM; if (!custom.hidden) custom.focus(); };
-    wrap.append(sel, custom); l.append(wrap); box.append(l);
+    if (id !== "haiku") {  // Haiku is always Haiku: no model to choose, only a role
+      const current = S.settings.models[id] || "";
+      const l = document.createElement("label"); l.textContent = "Model: " + a.label;
+      const wrap = document.createElement("span"); wrap.className = "modelpick";
+      const sel = document.createElement("select"); sel.dataset.agent = id;
+      sel.append(new Option("domyślny", ""));
+      for (const o of modelLists[id] || []) sel.append(new Option(o.label === o.value ? o.value : `${o.label} (${o.value})`, o.value));
+      sel.append(new Option("Inny (wpisz)…", CUSTOM));
+      const custom = document.createElement("input"); custom.type = "text"; custom.placeholder = "nazwa modelu";
+      const known = [...sel.options].some(o => o.value === current && o.value !== CUSTOM);
+      sel.value = known ? current : CUSTOM;
+      custom.value = known ? "" : current;
+      custom.hidden = sel.value !== CUSTOM;
+      sel.onchange = () => { custom.hidden = sel.value !== CUSTOM; if (!custom.hidden) custom.focus(); };
+      wrap.append(sel, custom); l.append(wrap); box.append(l);
+    }
     const rl = document.createElement("label"); rl.className = "rolerow"; rl.textContent = "Rola";
     const role = document.createElement("input"); role.type = "text"; role.className = "rolepick"; role.dataset.agent = id;
     role.maxLength = 400; role.value = (S.settings.roles || {})[id] || "";
     role.placeholder = {claude: "np. inżynier: koduje i wdraża", codex: "np. tester i architekt", antigravity: "np. pedagog: ocenia z perspektywy dziecka"}[id] || "np. recenzent";
+    if (id === "haiku") { rl.textContent = "Rola: Haiku"; rl.style.margin = "9px 0"; }
     rl.append(role); box.append(rl);
   }
 }
@@ -1262,8 +1295,7 @@ window.addEventListener("pywebviewready", async () => {
     await reload();
     if (r.warn) toast(r.warn);
   };
-  $("remotebtn").onclick = () => $("remotedlg").showModal();
-  $("remoteclose").onclick = () => $("remotedlg").close();
+  document.querySelectorAll("#settabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
   $("remotelink").onclick = () => api.open_link(S.remote.url);
   $("remotetoggle").onclick = async () => {
     if (S.remote.state !== "off") return api.remote_stop();
@@ -1283,18 +1315,14 @@ window.addEventListener("pywebviewready", async () => {
     $("mapon").checked = S.settings.map !== false;
     $("mapexclude").value = (S.settings.map_exclude || ["obiekty"]).join(", ");
     const mem = $("memory"); mem.dataset.loaded = "0"; mem.value = "";
-    $("dlg").showModal(); drawLimits(); loadModelLists(false);
+    $("dlg").showModal(); setTab(document.querySelector("#settabs .on").dataset.tab); loadModelLists(false);
     mem.value = await api.get_memory(); mem.dataset.original = mem.value; mem.dataset.loaded = "1";
   };
   $("limitsrefresh").onclick = drawLimits;
   $("modelsrefresh").onclick = () => loadModelLists(true);
   $("aboutbtn").onclick = openAbout;
-  $("mapbtn").onclick = () => { $("startstate").textContent = ""; $("mapdlg").showModal(); showMap(false); };
   $("maprefresh").onclick = () => showMap(true);
   $("mapopen").onclick = () => api.open_map_folder();
-  $("mapclose").onclick = () => $("mapdlg").close();
-  $("statsbtn").onclick = () => { $("statsdlg").showModal(); showStats(); };
-  $("statsclose").onclick = () => $("statsdlg").close();
   $("statsmeasure").onchange = () => statsData && drawStats();
   document.querySelectorAll("#statsrange button").forEach(b => b.onclick = () => { statsRange = b.dataset.r; showStats(); });
   $("startfiles").onclick = async () => {
