@@ -184,12 +184,11 @@ dialog menu{display:flex;justify-content:flex-end;padding:0;margin:14px 0 0}
 #modelsrefresh{font-size:13px;margin:2px 0}
 dialog label.rolerow{margin:-4px 0 12px;color:var(--dim);font-size:13px}
 dialog input.rolepick{width:340px}
-#aboutdlg{width:560px;max-height:90vh}
-#aboutdlg .abouthead{display:flex;gap:14px;align-items:center;margin-bottom:6px}
-#aboutdlg .abouthead h3{margin:0 0 3px}#aboutdlg .dim{color:var(--dim);font-size:13px}
-#aboutdlg a{color:var(--gemini)}
-#aboutdlg .help{font-size:14.5px;line-height:1.5}#aboutdlg .help h4{margin:12px 0 4px}
-#aboutdlg .help p{margin:5px 0}
+#helppane .abouthead{display:flex;gap:14px;align-items:center;margin-bottom:6px}
+#helppane .abouthead h3{margin:0 0 3px}#helppane .dim{color:var(--dim);font-size:13px}
+#helppane a{color:var(--gemini)}
+#helppane .help{font-size:14.5px;line-height:1.5}#helppane .help h4{margin:12px 0 4px}
+#helppane .help p{margin:5px 0}
 #updstate{margin:3px 0 6px}#updstate.new{color:var(--codex);font-weight:600}
 #updnotes{white-space:pre-wrap;font-size:13px;color:var(--dim);max-height:130px;overflow-y:auto;margin-bottom:7px}
 #updnotes:empty{display:none}
@@ -303,30 +302,6 @@ dialog input#mapexclude{width:250px}
   <small id="setupnote">Program zainstaluje brakujące CLI, a potem otworzy po kolei okna logowania. Następne okno pojawi się po zamknięciu poprzedniego.</small>
   <menu style="gap:8px"><button id="setupclose" type="button">Zamknij</button><button id="setupgo" type="button">Zainstaluj i zaloguj brakujące</button></menu>
 </dialog>
-<dialog id="aboutdlg">
-  <div class="abouthead"><img class="logo" alt="" width="54" height="54"><div><h3>TrybunAI <span id="aboutver"></span></h3>
-    <div class="dim">Autor: <b id="aboutauthor"></b> · licencja MIT · <a href="#" data-href="repo">GitHub</a> · <a href="#" data-href="page">strona</a></div></div></div>
-  <fieldset><legend>Aktualizacje</legend>
-    <div id="updstate" role="status">Sprawdzam…</div>
-    <div id="updnotes"></div>
-    <button id="updcheck" type="button">Sprawdź ponownie</button> <button id="updgo" type="button" hidden></button>
-  </fieldset>
-  <div class="help">
-    <h4>Jak to działa</h4>
-    <p><b>Folder projektu.</b> Modele pracują w folderze, w którym leży exe (zmienisz go, klikając ścieżkę na górze). Historia czatu i pamięć projektu są w <code>.trybunai</code>.</p>
-    <p><b>Czat.</b> Przyciski modeli na dole wybierają, kto odpowiada. Możesz też zacząć od <code>@claude</code>, <code>@codex</code>, <code>@agy</code>, <code>@haiku</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p>
-    <p><b>Uprawnienia</b> (obok modeli) dotyczą wybranego modelu: tylko odczyt, edycja plików albo pełny dostęp. Gdy model chce więcej, pod odpowiedzią pojawia się kartka z przyciskiem jednorazowej zgody.</p>
-    <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem model, który ma wdrażać, pisze podsumowanie z ponumerowanymi propozycjami, a Ty zaznaczasz, co wdrożyć (punkty sporne są domyślnie odznaczone), i możesz dopisać uwagi. Dopiero wtedy wdraża wybrane punkty, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić. Bez podsumowania (wdrożenie od razu) ustawisz to w menu Debata.</p>
-    <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
-    <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
-    <p><b>Mapa</b> (Ustawienia → Mapa) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
-    <p><b>Statystyki</b> (Ustawienia → Statystyki) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”; wcześniejsza historia jest dołączana z dzienników Claude i Codexa.</p>
-    <p>Gdy model pracuje, na górnym pasku świeci jego pigułka z czasem pracy i bieżącą czynnością. Kliknięcie przewija do jego odpowiedzi.</p>
-    <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
-    <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu, mapa, statystyki, zdalne sterowanie oraz plany i limity kont, każde w osobnej zakładce. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. Zakładka <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
-  </div>
-  <menu><button id="aboutclose" type="button">Zamknij</button></menu>
-</dialog>
 <dialog id="debdlg">
   <h3>Debata modeli</h3>
   <textarea id="debtopic" placeholder="Temat debaty, np. jak uprościć odejmowanie w grze"></textarea>
@@ -354,6 +329,7 @@ dialog input#mapexclude{width:250px}
     <button type="button" data-tab="stats">Statystyki</button>
     <button type="button" data-tab="remote" id="remotebtn">Zdalnie</button>
     <button type="button" data-tab="limits">Limity</button>
+    <button type="button" data-tab="help">O programie</button>
   </nav>
   <div id="setpanes">
   <section data-pane="models">
@@ -361,6 +337,8 @@ dialog input#mapexclude{width:250px}
   <fieldset id="everyone"><legend>Kto odpowiada na @wszyscy</legend></fieldset>
   <div id="models"></div>
   <button id="modelsrefresh" type="button">Odśwież listy modeli</button>
+  <label>Tekst z załączonego PDF-a, najwyżej znaków <input id="pdflimit" type="number" min="0" max="500000" step="1000"></label>
+  <small>Treść PDF-a trafia do modelu jako tekst, ucięta do tego limitu. 0 = nie dołączaj tekstu PDF-ów.</small>
   <small>„Domyślny” to model, który dane CLI wybiera samo. Listy pochodzą z zainstalowanych CLI: Codex odświeża swoją przy każdym uruchomieniu, Antigravity po kliknięciu „Odśwież” (musi być zalogowany). Ustawienia są zapisywane w folderze projektu.</small>
   </section>
   <section data-pane="memory" hidden>
@@ -417,6 +395,29 @@ dialog input#mapexclude{width:250px}
   <h4>Plany i limity</h4>
     <div id="limits" role="status"></div>
     <button id="limitsrefresh" type="button">Odśwież</button>
+  </section>
+  <section data-pane="help" id="helppane" hidden>
+  <div class="abouthead"><img class="logo" alt="" width="54" height="54"><div><h3>TrybunAI <span id="aboutver"></span></h3>
+    <div class="dim">Autor: <b id="aboutauthor"></b> · licencja MIT · <a href="#" data-href="repo">GitHub</a> · <a href="#" data-href="page">strona</a></div></div></div>
+  <fieldset><legend>Aktualizacje</legend>
+    <div id="updstate" role="status">Sprawdzam…</div>
+    <div id="updnotes"></div>
+    <button id="updcheck" type="button">Sprawdź ponownie</button> <button id="updgo" type="button" hidden></button>
+  </fieldset>
+  <div class="help">
+    <h4>Jak to działa</h4>
+    <p><b>Folder projektu.</b> Modele pracują w folderze, w którym leży exe (zmienisz go, klikając ścieżkę na górze). Historia czatu i pamięć projektu są w <code>.trybunai</code>.</p>
+    <p><b>Czat.</b> Przyciski modeli na dole wybierają, kto odpowiada. Możesz też zacząć od <code>@claude</code>, <code>@codex</code>, <code>@agy</code>, <code>@haiku</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p>
+    <p><b>Uprawnienia</b> (obok modeli) dotyczą wybranego modelu: tylko odczyt, edycja plików albo pełny dostęp. Gdy model chce więcej, pod odpowiedzią pojawia się kartka z przyciskiem jednorazowej zgody.</p>
+    <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem model, który ma wdrażać, pisze podsumowanie z ponumerowanymi propozycjami, a Ty zaznaczasz, co wdrożyć (punkty sporne są domyślnie odznaczone), i możesz dopisać uwagi. Dopiero wtedy wdraża wybrane punkty, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić. Bez podsumowania (wdrożenie od razu) ustawisz to w menu Debata.</p>
+    <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
+    <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy nowej rozmowie (📄 na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
+    <p><b>Mapa</b> (Ustawienia → Mapa) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
+    <p><b>Statystyki</b> (Ustawienia → Statystyki) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”; wcześniejsza historia jest dołączana z dzienników Claude i Codexa.</p>
+    <p>Gdy model pracuje, na górnym pasku świeci jego pigułka z czasem pracy i bieżącą czynnością. Kliknięcie przewija do jego odpowiedzi.</p>
+    <p><b>Tokeny przy odpowiedzi</b> pokazują, ile model wczytał. Gdy sesja urośnie ponad 150 tys. tokenów, odświeża się sama (wyłącznik w Ustawieniach).</p>
+    <p><b>Ustawienia:</b> modele z listy, role modeli, kto odpowiada na <code>@wszyscy</code>, pamięć projektu, mapa, statystyki, zdalne sterowanie oraz plany i limity kont, każde w osobnej zakładce. <b>Instalacja</b> doinstaluje i zaloguje brakujące narzędzia. Zakładka <b>Zdalnie</b> pozwala sterować Claude'em z aplikacji Claude na telefonie.</p>
+  </div>
   </section>
   </div></div>
 </form></dialog>
@@ -809,6 +810,10 @@ window.onEvents = events => {
       addLine($("setuplog"), "", e.ready ? "Wszystko gotowe." : "Nie wszystko się udało: szczegóły powyżej.");
       $("setupclose").disabled = false;
       refreshSetup();
+    } else if (e.t === "memory_start") {
+      workStart("memory", "prompter", null, {name: "Pamięć"});
+    } else if (e.t === "memory_end") {
+      workEnd("memory");
     } else if (e.t === "p_start") {
       setPrompter(true, `Prompter (${S.agents[e.engine].label}) pracuje…`);
       workStart("prompter", "prompter", null, {name: "Prompter", target: $("input"), stop: () => api.stop("prompter")});
@@ -936,7 +941,7 @@ async function checkUpdate() {
   const fresh = !!(release && release.ok && release.newer);
   $("newdot").hidden = !fresh;
   $("aboutbtn").title = fresh ? `Jest nowa wersja ${release.version}: kliknij, aby zaktualizować` : "O programie i aktualizacje";
-  if ($("aboutdlg").open) drawUpdate();
+  drawUpdate();
 }
 async function showMap(refresh) {
   const st = $("mapstate");
@@ -1084,8 +1089,9 @@ function drawStats() {
 async function openAbout() {
   about = about || await api.about();
   $("aboutver").textContent = about.version; $("aboutauthor").textContent = about.author;
-  $("aboutdlg").querySelector(".logo").src = logoData;
-  $("aboutdlg").showModal();
+  $("helppane").querySelector(".logo").src = logoData;
+  if (!$("dlg").open) await $("settings").onclick();  // same loading as the Ustawienia button
+  setTab("help");
   if (release) drawUpdate(); else checkUpdate();
 }
 async function installUpdate() {
@@ -1314,6 +1320,7 @@ window.addEventListener("pywebviewready", async () => {
     fillSettings(); $("autofresh").checked = S.settings.auto_fresh !== false;
     $("mapon").checked = S.settings.map !== false;
     $("mapexclude").value = (S.settings.map_exclude || ["obiekty"]).join(", ");
+    $("pdflimit").value = S.settings.pdf_limit ?? 30000;
     const mem = $("memory"); mem.dataset.loaded = "0"; mem.value = "";
     $("dlg").showModal(); setTab(document.querySelector("#settabs .on").dataset.tab); loadModelLists(false);
     mem.value = await api.get_memory(); mem.dataset.original = mem.value; mem.dataset.loaded = "1";
@@ -1332,10 +1339,9 @@ window.addEventListener("pywebviewready", async () => {
     if (r.rules_missing) out.push("Brak REGULY.md: utwórz go w folderze projektu i wpisz wspólne zasady.");
     $("startstate").textContent = out.join("\n"); $("startstate").style.whiteSpace = "pre-wrap";
   };
-  $("aboutclose").onclick = () => $("aboutdlg").close();
   $("updcheck").onclick = checkUpdate;
   $("updgo").onclick = installUpdate;
-  $("aboutdlg").querySelectorAll("a[data-href]").forEach(a => a.onclick = e => { e.preventDefault(); api.open_link(about[a.dataset.href]); });
+  $("helppane").querySelectorAll("a[data-href]").forEach(a => a.onclick = e => { e.preventDefault(); api.open_link(about[a.dataset.href]); });
   $("savestate").onclick = async () => {
     const b = $("savestate"), mem = $("memory");
     if (mem.value !== mem.dataset.original) await api.set_memory(mem.value);  // keep a manual edit as the base
@@ -1357,6 +1363,7 @@ window.addEventListener("pywebviewready", async () => {
     const everyone = [...document.querySelectorAll("#everyone input:checked")].map(c => c.dataset.agent);
     const changes = {prompter: $("engine").value, models, everyone, auto_fresh: $("autofresh").checked,
                      roles: chosenRoles(), map: $("mapon").checked,
+                     pdf_limit: Math.max(0, parseInt($("pdflimit").value, 10) || 0),
                      map_exclude: $("mapexclude").value.split(",").map(x => x.trim()).filter(Boolean)};
     const r = await api.update_settings(changes);
     if (r.ok) Object.assign(S.settings, changes); else toast(r.error);

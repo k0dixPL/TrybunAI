@@ -514,6 +514,25 @@ class Runs(unittest.TestCase):
         self.assertEqual(kept[0].read_text(encoding="utf-8"), "{nie json")
         self.assertFalse((folder / "chat.json").exists())
 
+    def test_memory_update_is_announced_to_the_window(self):
+        with mock.patch.object(self.session, "_update_memory_locked", return_value=None):
+            self.session._update_memory()
+        kinds = [e["t"] for e in self.events if e["t"].startswith("memory")]
+        self.assertEqual(kinds, ["memory_start", "memory_end"])
+
+    def test_pdf_text_is_cut_to_the_limit(self):
+        folder = self.dir / ".trybunai" / "attachments"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "a.pdf").write_bytes(b"%PDF-1.4")
+        rel = ".trybunai/attachments/a.pdf"
+        pages = [mock.Mock(**{"extract_text.return_value": "abcdef"}),
+                 mock.Mock(**{"extract_text.return_value": "ghijkl"})]
+        with mock.patch.object(core, "PdfReader") as reader:
+            reader.return_value.pages = pages
+            text = self.session._pdf_text([rel], 8)
+            self.assertEqual(self.session._pdf_text([rel], 0), "")
+        self.assertEqual(text, f"Treść załącznika {rel} [tekst ucięty do limitu]:\nabcdef\ng")
+
     def test_second_send_while_busy_refused(self):
         self.session.send("@gemini ZAWIS", "claude")
         self.assertFalse(self.session.send("@gemini znowu", "claude")["ok"])

@@ -13,6 +13,8 @@ import time
 import uuid
 from pathlib import Path
 
+from pypdf import PdfReader
+
 from . import limits, mapa, models, setup, stats
 from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
                      is_safe_arg, parse_event, session_name, stdin_payload)
@@ -451,6 +453,9 @@ class Session:
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
             if not isinstance(new.get("auto_fresh", True), bool) or not isinstance(new.get("map", True), bool):
                 return {"ok": False, "error": "Nieprawidłowe ustawienie."}
+            pdf_limit = new.get("pdf_limit", 30000)
+            if not isinstance(pdf_limit, int) or isinstance(pdf_limit, bool) or not 0 <= pdf_limit <= 500_000:
+                return {"ok": False, "error": "Limit tekstu z PDF-a: od 0 do 500 000 znaków."}
             roles = new.get("roles", {})
             if not isinstance(roles, dict) or any(a not in AGENTS or not isinstance(r, str) or len(r) > 400
                                                   for a, r in roles.items()):
@@ -814,6 +819,9 @@ class Session:
             if attachments:
                 body += "\n\nZałączone pliki (ścieżki względem folderu projektu):\n" + \
                     "\n".join(f"- {a}" for a in attachments)
+                pdf = self._pdf_text(attachments, self.settings.get("pdf_limit", 30000))
+                if pdf:
+                    body += "\n\n" + pdf
             fresh = not state.get("id")
             project_map, log_seen = self._map_note(agent, state, fresh)
             prompt = build_turn_prompt(unseen, agent, body, include_own=fresh,
@@ -987,7 +995,11 @@ class Session:
         """Ask the prompter engine (Haiku by default) to fold the recent chat into the memory.
         Returns an error text or None."""
         with self._memory_lock:  # two updates at once would each overwrite the other's result
-            return self._update_memory_locked()
+            self.emit({"t": "memory_start"})
+            try:
+                return self._update_memory_locked()
+            finally:
+                self.emit({"t": "memory_end"})
 
     def _update_memory_locked(self):
         with self._lock:
@@ -1095,6 +1107,32 @@ class Session:
     def _attachment_path(self, rel):
         path = self._inside_project(rel)
         return path if path and path.parent == self._state_path.parent / "attachments" else None
+
+    def _pdf_text(self, attachments, limit):
+        """Text of the PDF attachments, read until `limit` characters in total. Empty when none."""
+        parts, left = [], limit
+        for rel in attachments:
+            path = self._attachment_path(rel)
+            if not path or path.suffix.lower() != ".pdf" or left <= 0:
+                continue
+            try:
+                pages, text = PdfReader(str(path)).pages, []
+                size = 0
+                for page in pages:
+                    chunk = page.extract_text() or ""
+                    text.append(chunk)
+                    size += len(chunk)
+                    if size > left:
+                        break
+                text = "\n".join(text)
+            except Exception as exc:  # a broken PDF must not stop the turn
+                parts.append(f"[Nie udało się odczytać tekstu z {rel}: {type(exc).__name__}]")
+                continue
+            cut = text[:left]
+            left -= len(cut)
+            note = " [tekst ucięty do limitu]" if len(cut) < len(text) else ""
+            parts.append(f"Treść załącznika {rel}{note}:\n{cut}")
+        return "\n\n".join(parts)
 
     def _attachment_name(self, name):
         clean = re.sub(r"[^\w.\-]+", "_", Path(name).name) or "plik"

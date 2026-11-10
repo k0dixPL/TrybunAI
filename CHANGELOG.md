@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.0.24 — 2026-11-10
+- Tekst z załączonych PDF-ów trafia do prompta każdego modelu (w trybie „Tylko czytaj” modele nie otwierają PDF-ów same). Limit znaków ustawiasz w Ustawienia → Modele, domyślnie 30 000, 0 wyłącza.
+- Pomoc i „O programie” są w Ustawieniach jako zakładka. Znak zapytania przy „Nowa rozmowa” otwiera tę zakładkę i pokazuje kropkę, gdy jest nowsza wersja.
+- Pigułka „Pamięć” pokazuje się na górnym pasku podczas aktualizacji pamięci projektu.
+
 ## 1.0.23 — 2026-11-09
 - Ustawienia mają zakładki: Modele, Pamięć, Mapa, Statystyki, Zdalnie i Limity. Mapa, Statystyki
   i Zdalnie zniknęły z górnego paska i są teraz w Ustawieniach. Okno jest szersze (do 1000 px),
