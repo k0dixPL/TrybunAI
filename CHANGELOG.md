@@ -1,5 +1,11 @@
 # Zmiany
 
+## 1.0.30 — 2026-11-10
+- Przycisk „Archiwizuj czat” jasno komunikuje, że bieżąca rozmowa trafia do archiwum, ustalenia
+  zapisują się w pamięci projektu, a następnie zaczyna się nowy czat.
+- Odświeżono stronę projektu: ciemny wygląd i akcenty kolorystyczne dopasowane do aplikacji,
+  układ responsywny oraz informacja o archiwizacji.
+
 ## 1.0.29 — 2026-11-10
 - Specjaliści: zespół jak w grupie na komunikatorze. Przycisk ＋ na dolnym pasku dodaje członka zespołu
   z `@uchwytem`, nazwą, silnikiem (Claude, Codex, Antigravity), modelem, rolą i kolorem. Każdy ma własną

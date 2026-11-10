@@ -285,7 +285,7 @@ dialog input#mapexclude{width:250px}
   <div id="working" aria-live="polite"></div>
   <button id="setupbtn" class="ghost" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
   <button id="settings" title="Modele, pamięć, mapa, statystyki, zdalne sterowanie, limity">Ustawienia</button>
-  <button id="newchat" title="Archiwizuje czat i zaczyna nowy (najpierw zapisuje stan do pamięci projektu)">Nowa rozmowa</button>
+  <button id="newchat" title="Przenosi bieżący czat do archiwum, zapisuje ustalenia w pamięci projektu i rozpoczyna nową rozmowę">Archiwizuj czat</button>
   <button id="aboutbtn" class="iconbtn" title="O programie i aktualizacje" aria-label="O programie">?<span id="newdot" hidden></span></button>
 </header>
 <div id="toast" role="alert"></div>
@@ -444,7 +444,7 @@ dialog input#mapexclude{width:250px}
     <p><b>Uprawnienia</b> (obok modeli) dotyczą wybranego modelu: tylko odczyt, edycja plików albo pełny dostęp. Gdy model chce więcej, pod odpowiedzią pojawia się kartka z przyciskiem jednorazowej zgody.</p>
     <p><b>Debata.</b> Kilka modeli dyskutuje w rundach tylko do odczytu. Potem model, który ma wdrażać, pisze podsumowanie z ponumerowanymi propozycjami, a Ty zaznaczasz, co wdrożyć (punkty sporne są domyślnie odznaczone), i możesz dopisać uwagi. Dopiero wtedy wdraża wybrane punkty, a pozostali sprawdzają i dają werdykt: akceptuję, uwagi albo nie mogę sprawdzić. Bez podsumowania (wdrożenie od razu) ustawisz to w menu Debata.</p>
     <p><b>Prompter</b> (Alt+P) przepisuje Twoją notatkę na porządne polecenie. <b>Załącz</b> dodaje pliki i obrazy (obraz wkleisz też przez Ctrl+V).</p>
-    <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy „Nowej rozmowie” (na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
+    <p><b>Pamięć projektu</b> to zwięzłe ustalenia, w tym sekcja „Nie ruszać”. Nowa sesja modelu startuje od niej zamiast od całej historii, co oszczędza limity. Zapisuje się przy „Archiwizuj czat” (na górze), przy świeżej sesji i po kliknięciu „Zapisz stan teraz”.</p>
     <p><b>Mapa</b> (Ustawienia → Mapa) to krótkie notatki o budowie kodu w <code>.trybunai/mapa</code>: lista plików, publiczne funkcje modułów i kto od kogo zależy. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program. Po każdej turze z edycją TrybunAI dopisuje do dziennika zmian, kto i co zmienił, a pozostałe modele dostają tę informację przy swojej następnej turze. „Pliki startowe” tworzą CLAUDE.md, AGENTS.md i GEMINI.md odsyłające do REGULY.md i mapy.</p>
     <p><b>Statystyki</b> (Ustawienia → Statystyki) pokazują zużycie tokenów w czasie: wykres z podziałem na modele za 24 godziny, 7, 30 albo 90 dni, osobno nowe wejście, odczyt z cache i wyjście. Liczą się wszystkie uruchomienia: czat, debaty, sprawdzanie, Prompter i aktualizacja pamięci. Dane są w <code>.trybunai/tokeny.jsonl</code> i nie znikają po „Nowej rozmowie”; wcześniejsza historia jest dołączana z dzienników Claude i Codexa.</p>
     <p>Gdy model pracuje, na górnym pasku świeci jego pigułka z czasem pracy i bieżącą czynnością. Kliknięcie przewija do jego odpowiedzi.</p>
@@ -1387,7 +1387,7 @@ window.addEventListener("pywebviewready", async () => {
   };
   $("project").onclick = () => api.open_project_folder();
   $("newchat").onclick = async () => {
-    if (!confirm("Zacząć nową rozmowę? Ustalenia trafią do pamięci projektu, a rozmowa do archiwum w folderze .trybunai.")) return;
+    if (!confirm("Zarchiwizować bieżący czat i rozpocząć nową rozmowę? Ustalenia trafią do pamięci projektu, a archiwum zapisze się w folderze .trybunai.")) return;
     const b = $("newchat"), label = b.textContent, title = b.title;
     b.disabled = true; b.textContent = "Zapisuję…"; b.title = "Zapisuję stan do pamięci projektu…";
     const r = await api.new_chat();

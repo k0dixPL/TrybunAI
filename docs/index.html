@@ -46,6 +46,45 @@ border-radius:10px;padding:12px 16px;color:var(--dim);font-size:15px}
 .giscus{max-width:820px;margin:0 auto}
 footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;border-top:1px solid var(--line);margin-top:20px}
 @media (max-width:600px){header nav{display:none}.hero p{font-size:16px}}
+/* TrybunAI app-inspired refresh */
+@media (prefers-color-scheme:light){:root{--bg:#14161a;--panel:#1c1f25;--line:#323742;--text:#e6e8ec;--dim:#969cab}}
+body{background:radial-gradient(ellipse at 8% 10%,#e08a5f16,transparent 30rem),radial-gradient(ellipse at 92% 24%,#4fbf8f12,transparent 34rem),var(--bg)}
+.wrap{max-width:1180px;padding:0 28px}
+header{position:relative;gap:14px;padding:13px 0;border-bottom:1px solid var(--line)}
+header img{width:34px;height:34px}header b{font-size:18px;letter-spacing:.01em}
+header nav{gap:6px;font-size:14px}
+header nav a{padding:7px 11px;border:1px solid transparent;border-radius:8px;transition:background .18s,border-color .18s,color .18s}
+header nav a:hover{background:var(--panel);border-color:var(--line);color:var(--text)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:34px;align-items:center;padding:58px 0 34px}
+.hero{text-align:left;padding:0}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--dim);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin:0 0 17px}
+.eyebrow::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--codex);box-shadow:0 0 13px var(--codex)}
+.hero h1{font-size:clamp(36px,4.2vw,58px);letter-spacing:-.045em;line-height:1.06;margin:0 0 18px}
+.hero h1 span{background:linear-gradient(95deg,var(--claude),var(--haiku),var(--codex));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:17px;max-width:540px;margin:0 0 24px}
+.dl{border-radius:9px;padding:12px 19px;font-size:15px;box-shadow:0 0 24px #3d6fd133;transition:transform .18s,filter .18s}
+.dl:hover{transform:translateY(-2px);filter:brightness(1.12)}
+.meta{font-size:13px;margin-top:12px}
+.shot{position:relative;margin:0;max-width:none;border-radius:13px;border-color:#424854;box-shadow:0 28px 70px #0008,0 0 40px #4fbf8f0c}
+.shot img{width:100%}
+section{padding:42px 0;border-top:1px solid #ffffff0b}
+h2{font-size:25px;letter-spacing:-.02em;margin:0 0 22px}
+.grid{grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}
+.card{position:relative;background:linear-gradient(145deg,#202329,#1a1c21);border:1px solid #343943;border-top:1px solid #343943;border-radius:10px;padding:18px 19px;transition:transform .18s,border-color .18s,box-shadow .18s}
+.card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--c,var(--line)) 55%,var(--line));box-shadow:0 12px 30px #0003}
+.card::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;border-radius:10px 0 0 10px;background:var(--c,var(--line));opacity:.85}
+.card h3{font-size:16px}.card p{font-size:14px;line-height:1.65}
+code{color:#d9e2f2;background:#121418;border-color:#343943;font-size:13px}
+ol.steps{counter-reset:steps;list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:none}
+ol.steps li{position:relative;margin:0;padding:18px 18px 18px 54px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--dim);font-size:14px}
+ol.steps li::before{counter-increment:steps;content:counter(steps);position:absolute;left:17px;top:16px;width:24px;height:24px;display:grid;place-items:center;border-radius:7px;background:#3d6fd122;color:#8eafff;font-weight:700}
+.note{max-width:none;background:#d3bd630b;border-color:#4a4530;border-left-color:var(--haiku);font-size:14px}
+#komentarze .lead{font-size:14px}
+.giscus{padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+footer{border-color:var(--line);font-size:13px}
+@media(max-width:800px){.hero-grid{grid-template-columns:1fr;gap:26px;padding:40px 0 30px}.hero{text-align:center}.hero p{margin-left:auto;margin-right:auto}.eyebrow{justify-content:center}.shot{max-width:760px}.wrap{padding:0 20px}}
+@media(max-width:600px){header{flex-wrap:wrap}header nav{display:flex;order:3;width:100%;overflow-x:auto;margin:0;gap:4px}header nav a{white-space:nowrap;padding:6px 9px}.hero-grid{padding-top:32px}.hero h1{font-size:36px}.hero p{font-size:15px}.grid{grid-template-columns:1fr 1fr;gap:9px}.card{padding:15px}.card p{font-size:13px}ol.steps{grid-template-columns:1fr}section{padding:32px 0}}
+@media(max-width:420px){.grid{grid-template-columns:1fr}.wrap{padding:0 15px}}
 </style>
 </head>
 <body>
@@ -56,7 +95,9 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
     <nav><a href="#funkcje">Funkcje</a><a href="#start">Jak zacząć</a><a href="#komentarze">Komentarze</a><a href="https://github.com/k0dixPL/TrybunAI">GitHub</a></nav>
   </header>
 
+  <div class="hero-grid">
   <div class="hero">
+    <div class="eyebrow">Claude · Codex · Antigravity · Haiku</div>
     <h1>Claude, Codex, Antigravity i Haiku<br><span>w jednym oknie czatu</span></h1>
     <p>Program na Windows, który rozmawia z kilkoma modelami AI naraz w folderze Twojego projektu. Modele widzą nawzajem swoje odpowiedzi, mogą debatować, a jeden wdraża ustalenia po Twoim wyborze.</p>
     <a class="dl" id="download" href="https://github.com/k0dixPL/TrybunAI/releases/latest/download/TrybunAI.exe">
@@ -68,13 +109,15 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
 
   <div class="shot"><img src="screenshot.png" alt="Okno TrybunAI: debata Claude, Codex i Antigravity, a potem wdrożenie przez Claude" width="1084" height="721"></div>
 
+  </div>
+
   <section id="funkcje">
     <h2>Co potrafi</h2>
     <div class="grid">
       <div class="card" style="--c:var(--claude)"><h3>Wspólny czat</h3><p>Piszesz <code>@claude</code>, <code>@codex</code>, <code>@agy</code>, <code>@haiku</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p></div>
       <div class="card" style="--c:var(--accent)"><h3>Specjaliści</h3><p>Zespół jak w grupie na komunikatorze. Przycisk <b>＋</b> dodaje np. <code>@arch</code>: silnik i model, rola, umiejętności i kolor. Każdy ma własną rozmowę i bierze udział w debatach.</p></div>
       <div class="card" style="--c:var(--codex)"><h3>Debaty modeli</h3><p>Wybierasz uczestników, liczbę rund, kto zaczyna i kto kończy. Najpierw dostajesz podsumowanie i sam zaznaczasz, co wdrożyć. Dopiero potem jeden model wdraża wybrane punkty, a reszta je sprawdza.</p></div>
-      <div class="card" style="--c:var(--agy)"><h3>Pamięć projektu</h3><p>Zwięzłe ustalenia projektu zamiast ciągnięcia ogromnej historii. Długie sesje odświeżają się same, co mocno oszczędza limity.</p></div>
+      <div class="card" style="--c:var(--agy)"><h3>Pamięć i archiwum</h3><p>„Archiwizuj czat” zapisuje ustalenia do pamięci projektu, przenosi rozmowę do archiwum i zaczyna nową. Długie sesje modeli mogą odświeżać się same, oszczędzając limity.</p></div>
       <div class="card" style="--c:var(--haiku)"><h3>Limity pod kontrolą</h3><p>Plan i zużycie limitów Claude, Codex i Antigravity w jednym miejscu. Przy każdej odpowiedzi widać rozmiar kontekstu.</p></div>
       <div class="card"><h3>Uprawnienia na model</h3><p>Tylko odczyt, edycja plików albo pełny dostęp, osobno dla każdego modelu. Debaty zawsze tylko do odczytu.</p></div>
       <div class="card"><h3>Prompter</h3><p>Haiku przepisuje chaotyczną notatkę na porządny prompt, zanim go wyślesz.</p></div>
