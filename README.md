@@ -22,11 +22,9 @@
 
 > ⭐ **Podoba Ci się TrybunAI?** Kliknij **Star** w prawym górnym rogu tej strony. Nic nie kosztuje, a pomaga innym znaleźć projekt.
 
-![Czat TrybunAI: debata trzech modeli i werdykt](docs/screenshot.png)
+![Czat TrybunAI: debata trzech modeli, werdykt i pracujący Haiku](docs/screenshot.png)
 
-*Debata w czacie: modele podają suchary, a człowiek wybiera, który wdrożyć. Werdykt „AKCEPTUJĘ” to już sprawa Codexa.*
-
-> TODO: zrzut powyżej jest sprzed wersji 1.0.23 i pokazuje na górnym pasku przyciski „Mapa” i „Statystyki”. Do wymiany na aktualny.
+*Debata w czacie: trzy modele proponują suchary, Claude wdraża, Codex daje werdykt „✓ AKCEPTUJĘ”. Na górze świeci pigułka Haiku, który właśnie pisze suchar o tokenach. Kończy się na limicie, jak zawsze.*
 
 ## Spis treści
 
@@ -66,7 +64,10 @@ Potrzebne są własne konta: Claude (np. plan Pro), ChatGPT dla Codexa i/lub kon
 
 ## Funkcje
 
+- **Jeden projekt, jedno okno.** Modele pracują w folderze, w którym leży exe. Nazwa projektu na środku górnego paska otwiera ten folder w Eksploratorze. Inny projekt to osobna kopia exe w jego folderze.
 - **Wspólny czat.** Przyciski pod polem wpisu wybierają, kto odpowiada. Możesz też zacząć od `@claude`, `@codex`, `@agy`, `@haiku` albo `@wszyscy`. `@wszyscy` odpowiada w kolejności ustawionej w Ustawieniach.
+- **Widać, kto pracuje.** Pracujący model ma na górnym pasku świecącą pigułkę w swoim kolorze: czas pracy, bieżąca czynność (np. „Edit: ui/index.html”), kliknięcie przewija do odpowiedzi, a ✕ zatrzymuje model. Jego dymek pulsuje poświatą. Podczas aktualizacji pamięci pojawia się pigułka „Pamięć”.
+- **Zaznaczanie i kopiowanie.** Tekst odpowiedzi zaznaczysz myszą i skopiujesz jak w przeglądarce.
 - **Debaty.** Kilka modeli dyskutuje w rundach, tylko do odczytu. Potem wybrany model wdraża, a Ty zaznaczasz, co wdrożyć. Szczegóły: [Okno debaty](#okno-debaty).
 - **Role modeli.** Przy każdym modelu w Ustawieniach → Modele możesz wpisać rolę, np. „inżynier” albo „tester”. Rola trafia do promptu tego modelu. Role nie są ustawione domyślnie, wpisujesz je sam.
 - **Zgody na żądanie.** Gdy model chce zrobić coś ponad swoje uprawnienia, pod odpowiedzią pojawia się kartka z tym, o co prosi. Możesz pozwolić jednorazowo.
@@ -79,9 +80,9 @@ Potrzebne są własne konta: Claude (np. plan Pro), ChatGPT dla Codexa i/lub kon
 - **Zdalne sterowanie Claude.** Pozwala prowadzić sesje Claude z aplikacji Claude na telefonie.
 - **Aktualizacje.** Program sprawdza nowe wydania na GitHubie. Gdy jest nowsza wersja, przy przycisku „?” pojawia się kropka.
 
-<p align="center"><img src="docs/statystyki.png" width="620" alt="Okno Statystyki: zużycie tokenów w czasie z podziałem na modele"></p>
+<p align="center"><img src="docs/statystyki.png" width="760" alt="Okno Statystyki: zużycie tokenów w czasie z podziałem na modele"></p>
 
-*Claude czyta najwięcej, bo czyta cały projekt. Haiku czyta mało i jest tani. Statystyki nie oceniają, tylko liczą.*
+*Ustawienia → Statystyki. Claude czyta najwięcej, bo czyta cały projekt. Haiku czyta mało i jest tani. Statystyki nie oceniają, tylko liczą.*
 
 ## Ustawienia
 
@@ -97,7 +98,9 @@ Ustawienia otwierasz przyciskiem **Ustawienia** na górnym pasku. Zakładki są 
 | **Limity** | Plany i zużycie limitów kont, przycisk „Odśwież” |
 | **O programie** | Wersja, autor, sprawdzanie aktualizacji, instalacja nowej wersji, linki do GitHuba i strony |
 
-> 📷 TODO: zrzut zakładki Modele → `docs/zrzuty/ustawienia-modele.png`. Podpis: „Model z rolą »tester« nie odpowie na pytanie o kawę. Ma pisać testy.”
+<p align="center"><img src="docs/zrzuty/ustawienia-modele.png" width="760" alt="Ustawienia, zakładka Modele: Prompter, kto odpowiada na @wszyscy, modele i role"></p>
+
+*Codex ma rolę „tester, czepia się każdego przecinka”. Nie odpowie na pytanie o kawę. Ma pisać testy.*
 
 ### Modele
 
@@ -157,7 +160,9 @@ Pokazuje plan każdego konta i zużycie okien limitów. Przycisk **Odśwież** c
 
 ### O programie
 
-> 📷 TODO: zrzut zakładki O programie → `docs/zrzuty/o-programie.png`. Podpis: „Aktualizacja jest jak poniedziałek: zawsze przychodzi, ale zawsze można ją odłożyć.”
+<p align="center"><img src="docs/zrzuty/o-programie.png" width="760" alt="Ustawienia, zakładka O programie: wersja, aktualizacje i opis działania"></p>
+
+*Aktualizacja jest jak poniedziałek: zawsze przychodzi, ale zawsze można ją odłożyć.*
 
 Pokazuje wersję i autora. Przycisk **Sprawdź ponownie** szuka nowszego wydania. Gdy jest nowsza wersja, przycisk **Zaktualizuj** pobiera ją i uruchamia program od nowa. Linki prowadzą do GitHuba i strony projektu.
 
@@ -176,7 +181,23 @@ Przycisk **Debata** otwiera okno z tymi opcjami:
 | Pozostali sprawdzą wdrożenie | Po wdrożeniu inni modele dają werdykt | wyłączone |
 | Rundy poprawek po uwagach | 0 (tylko werdykt), 1 albo 2 | 1 |
 
-> 📷 TODO: zrzut okna debaty → `docs/zrzuty/debata.png`. Podpis: „Debata: dwie rundy, zero kawy, jeden wykonawca.”
+<p align="center"><img src="docs/zrzuty/debata.png" width="400" alt="Okno debaty: temat, uczestnicy, rundy, kto wdraża, podsumowanie i sprawdzanie"></p>
+
+*Debata: dwie rundy, zero kawy, jeden wykonawca.*
+
+### Podsumowanie i wybór
+
+Gdy debata ma wdrażającego, nic nie zmienia się w plikach od razu. Wdrażający pisze podsumowanie: na czym stanęło, gdzie zostały różnice zdań, i ponumerowaną listę propozycji. Pod nim pojawia się karta:
+
+- zaznaczasz, co wdrożyć (punkty oznaczone jako sporne są domyślnie odznaczone),
+- możesz dopisać własne uwagi, które mają pierwszeństwo przed ustaleniami debaty,
+- **Wdróż zaznaczone** uruchamia wdrożenie i sprawdzanie tylko wybranych punktów, **Nie wdrażaj** kończy sprawę.
+
+Modele czekają, ile trzeba. Wybór przetrwa zamknięcie programu. Wyłączenie opcji „Najpierw podsumowanie” przywraca wdrożenie od razu po debacie.
+
+<p align="center"><img src="docs/zrzuty/podsumowanie.png" width="760" alt="Podsumowanie debaty z kartą wyboru propozycji do wdrożenia"></p>
+
+*Automatyczne zamawianie kawy jest sporne, więc domyślnie odpada. Księgowa odetchnęła.*
 
 Werdykty: **✓ AKCEPTUJĘ**, **! UWAGI** albo **? NIE MÓGŁ SPRAWDZIĆ**. Debata działa tylko do odczytu. Wdraża dopiero wybrany model, z jego uprawnieniami.
 
@@ -200,6 +221,7 @@ Zmiana na „Pełny dostęp” pyta o potwierdzenie. Gdy model poprosi o więcej
 | Shift + Enter | Nowa linia |
 | Alt + P | Prompter: przepisz notatkę na prompt |
 | Ctrl + V | Wklej obraz ze schowka jako załącznik |
+| Ctrl + C | Kopiuj zaznaczony tekst z czatu |
 
 ## Uwagi, pytania, pomysły
 

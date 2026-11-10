@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.0.28 — 2026-11-10
+- Pola liczbowe (liczba rund w debacie, limit tekstu PDF) mają ciemny styl jak reszta pól; wcześniej
+  były białe z jasnym, prawie niewidocznym tekstem.
+- Zakładka „O programie” otwarta z Ustawień pokazuje wersję i autora (wcześniej tylko przez „?”).
+- Przycisk „Nowa rozmowa” po użyciu wraca do napisu zamiast ikony 📄.
+- Pomoc nie mówi już o zmianie folderu kliknięciem ścieżki ani o ikonie 📄.
+- Nazwa projektu na pasku nie jest ucinana, gdy świeci pigułka pracy; ustępuje opis czynności w pigułce.
+- README: nowe zrzuty (główne okno, debata, podsumowanie z wyborem, Modele, Statystyki, O programie)
+  i opis pigułki pracy, zaznaczania tekstu oraz zasady „jeden projekt, jedno okno”.
+
 ## 1.0.27 — 2026-11-10
 - Nazwa projektu jest na środku górnego paska, pogrubiona. Kliknięcie otwiera folder projektu w Eksploratorze.
 - Usunięty wybór innego folderu z okna: jedno okno to jeden projekt, inny projekt to inne okno.
