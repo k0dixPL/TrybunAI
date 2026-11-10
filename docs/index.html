@@ -80,6 +80,8 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
       <div class="card"><h3>Mapa kodu</h3><p>Krótkie notatki o budowie projektu w <code>.trybunai/mapa</code>. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program.</p></div>
       <div class="card"><h3>Statystyki</h3><p>Zużycie tokenów w czasie z podziałem na modele. Liczy też sesje sprzed pierwszego uruchomienia z tą wersją.</p></div>
       <div class="card"><h3>PDF w czacie</h3><p>Tekst z załączonego PDF-a trafia do prompta każdego modelu, także w trybie „Tylko czytaj”. Limit znaków ustawiasz w Ustawieniach.</p></div>
+      <div class="card"><h3>Widać, kto pracuje</h3><p>Pracujący model ma na górnym pasku świecącą pigułkę w swoim kolorze: czas pracy i bieżącą czynność. Kliknięcie przewija do jego odpowiedzi, a ✕ go zatrzymuje.</p></div>
+      <div class="card"><h3>Kopiowanie</h3><p>Tekst odpowiedzi zaznaczysz myszą i skopiujesz jak w przeglądarce. Bloki kodu mają przycisk „Kopiuj”.</p></div>
       <div class="card"><h3>Zdalne sterowanie</h3><p>Opcjonalnie możesz sterować sesjami tego komputera z aplikacji Claude. Włącza się w Ustawieniach.</p></div>
     </div>
   </section>
@@ -87,12 +89,13 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
   <section id="start">
     <h2>Jak zacząć</h2>
     <ol class="steps">
-      <li><b>Pobierz</b> <code>TrybunAI.exe</code> i skopiuj go do folderu swojego projektu. Modele pracują w folderze, w którym leży exe.</li>
+      <li><b>Pobierz</b> <code>TrybunAI.exe</code> i skopiuj go do folderu swojego projektu. Modele pracują w folderze, w którym leży exe. Jedno okno to jeden projekt; inny projekt to osobna kopia exe w jego folderze.</li>
       <li><b>Uruchom.</b> Przy pierwszym starcie przycisk <b>Instalacja</b> doinstaluje brakujące narzędzia (Claude Code, Codex, Antigravity) i po kolei otworzy okna logowania.</li>
       <li><b>Pisz.</b> Historia rozmowy i pamięć projektu zapisują się w folderze <code>.trybunai</code> obok exe.</li>
     </ol>
     <h2 style="margin-top:34px">Ustawienia</h2>
     <p class="lead" style="text-align:center;color:var(--dim);margin:-6px 0 18px">Przycisk <b>Ustawienia</b> na górnym pasku. Zakładki: <b>Modele</b> (role, uprawnienia, limit tekstu PDF), <b>Pamięć</b>, <b>Mapa</b>, <b>Statystyki</b>, <b>Zdalnie</b>, <b>Limity</b> i <b>O programie</b>. Pomoc jest w zakładce <b>O programie</b>; przycisk <b>?</b> na górnym pasku otwiera ją i pokazuje kropkę, gdy jest nowsza wersja.</p>
+    <div class="shot" style="margin-top:18px"><img src="zrzuty/ustawienia-modele.png" alt="Ustawienia, zakładka Modele: Prompter, kto odpowiada na @wszyscy, modele i role" width="1000"></div>
     <div class="note">Potrzebujesz własnych kont: Claude (np. plan Pro), ChatGPT dla Codexa i konta Google dla Antigravity. Wystarczy jedno z nich. Plik nie jest podpisany cyfrowo, więc Windows może pokazać ostrzeżenie SmartScreen: kliknij <b>Więcej informacji → Uruchom mimo to</b>.</div>
   </section>
 
