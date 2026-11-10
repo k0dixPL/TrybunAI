@@ -16,6 +16,21 @@ AGENTS = {
     # Same CLI as Claude, cheaper and faster model, its own conversation.
     "haiku": {"label": "Haiku", "binary": "claude", "family": "claude", "model": "haiku"},
 }
+BUILTIN = tuple(AGENTS)
+# Specialists run one of these CLIs under their own @handle, conversation, role and colour.
+FAMILIES = {f: {k: v for k, v in AGENTS[f].items() if k in ("binary", "fallback")}
+            for f in ("claude", "codex", "antigravity")}
+
+
+def register_personas(personas):
+    """Put the project's specialists into AGENTS. Removed ones stay, hidden, so old messages keep a name."""
+    for key in [k for k in AGENTS if k not in BUILTIN]:
+        del AGENTS[key]
+    for p in personas:
+        AGENTS[p["id"]] = {"label": p.get("name") or p["id"], **FAMILIES[p["family"]], "family": p["family"],
+                           "persona": True, "hidden": bool(p.get("hidden"))}
+
+
 MODES = ("read", "edit", "full")
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
 

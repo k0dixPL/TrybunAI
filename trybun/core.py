@@ -16,8 +16,8 @@ from pathlib import Path
 from pypdf import PdfReader
 
 from . import limits, mapa, models, setup, stats
-from .agents import (AGENTS, IMAGE_SUFFIXES, MODES, build_command, build_remote_command, find_binary,
-                     is_safe_arg, parse_event, session_name, stdin_payload)
+from .agents import (AGENTS, BUILTIN, FAMILIES, IMAGE_SUFFIXES, MODES, build_command, build_remote_command,
+                     find_binary, is_safe_arg, parse_event, register_personas, session_name, stdin_payload)
 from .remote import RemoteControl
 
 STATE_DIR = ".trybunai"
@@ -35,6 +35,44 @@ _STRIP_ENV = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT", "_
 _MENTION = re.compile(r"^\s*@([\w-]+)[\s,:]*")
 _ALIASES = {"claude": ["claude"], "codex": ["codex"],
             "haiku": ["haiku"], "antigravity": ["antigravity"], "agy": ["antigravity"]}
+_HANDLE = re.compile(r"^[a-z][a-z0-9_-]{1,15}$")
+_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+MAX_PERSONAS = 20
+ROLE_LIMIT = 1000
+
+
+def _usable(agent):
+    return agent in AGENTS and not AGENTS[agent].get("hidden")
+
+
+def _aliases():
+    return {**_ALIASES, **{a: [a] for a in AGENTS if a not in BUILTIN and _usable(a)}}
+
+
+def check_personas(personas):
+    """None when the list is valid, otherwise the message for the user."""
+    if not isinstance(personas, list) or len(personas) > MAX_PERSONAS:
+        return f"Najwyżej {MAX_PERSONAS} specjalistów."
+    seen = set()
+    for p in personas:
+        if not isinstance(p, dict) or not isinstance(p.get("id"), str):
+            return "Nieprawidłowy specjalista."
+        pid = p["id"]
+        if not _HANDLE.match(pid):
+            return f"@{pid}: uchwyt to 2–16 znaków: małe litery, cyfry, - i _, na początku litera."
+        if pid in seen or pid in _ALIASES or pid in _EVERYONE or pid in ("debata", "debate"):
+            return f"@{pid} jest już zajęty."
+        seen.add(pid)
+        if p.get("family") not in FAMILIES:
+            return f"@{pid}: nieznany silnik."
+        name = p.get("name", "")
+        if not isinstance(name, str) or len(name) > 30:
+            return f"@{pid}: nazwa może mieć najwyżej 30 znaków."
+        if not isinstance(p.get("hidden", False), bool):
+            return "Nieprawidłowy specjalista."
+    return None
+
+
 _LOST_SESSION = re.compile(
     r"(no (conversation|session|thread|rollout)|(session|thread|conversation).{0,40}not found"
     r"|invalid session identifier)", re.I)
@@ -58,10 +96,11 @@ def parse_targets(text, default, everyone=None):
     while True:
         match = _MENTION.match(rest)
         name = match.group(1).lower() if match else None
-        if name not in _ALIASES and name not in _EVERYONE:
+        aliases = _aliases()
+        if name not in aliases and name not in _EVERYONE:
             break
         mentioned = True
-        for agent in everyone if name in _EVERYONE else _ALIASES[name]:
+        for agent in everyone if name in _EVERYONE else aliases[name]:
             if agent not in targets:
                 targets.append(agent)
         rest = rest[match.end():]
@@ -413,6 +452,14 @@ class Session:
             old_mode = self.settings.pop("mode", None)
             if old_mode and not self.settings["modes"]:
                 self.settings["modes"] = {a: old_mode for a in AGENTS}
+        if check_personas(self.settings.get("personas", [])):
+            self.settings["personas"] = []  # a hand-edited file must not take the chat down
+        self._register(self.settings.get("personas", []))
+
+    def _register(self, personas):
+        register_personas(personas)
+        for p in personas:
+            self._binaries[p["id"]] = self._binaries.get(p["family"])
 
     def save(self):
         with self._lock:
@@ -435,38 +482,60 @@ class Session:
                 "remote": self._remote.status(),
                 "context_warn": CONTEXT_WARN,
                 "live_sessions": [a for a, s in self.sessions.items() if s.get("id")],
-                "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a))}
+                "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a)),
+                               "family": AGENTS[a].get("family", a), "persona": a not in BUILTIN,
+                               "hidden": bool(AGENTS[a].get("hidden"))}
                            for a in AGENTS},
             }
 
     def update_settings(self, changes):
         with self._lock:
             new = {**self.settings, **changes}
-            if any(a not in AGENTS for a in new["everyone"]):
-                return {"ok": False, "error": "Nieprawidłowe ustawienie."}
-            if any(m not in MODES for m in new["modes"].values()) or new["target"] not in AGENTS or new["prompter"] not in AGENTS:
-                return {"ok": False, "error": "Nieprawidłowe ustawienie."}
-            if not isinstance(new.get("auto_fresh", True), bool) or not isinstance(new.get("map", True), bool):
-                return {"ok": False, "error": "Nieprawidłowe ustawienie."}
-            pdf_limit = new.get("pdf_limit", 30000)
-            if not isinstance(pdf_limit, int) or isinstance(pdf_limit, bool) or not 0 <= pdf_limit <= 500_000:
-                return {"ok": False, "error": "Limit tekstu z PDF-a: od 0 do 500 000 znaków."}
-            roles = new.get("roles", {})
-            if not isinstance(roles, dict) or any(a not in AGENTS or not isinstance(r, str) or len(r) > 400
-                                                  for a, r in roles.items()):
-                return {"ok": False, "error": "Nieprawidłowa rola (maks. 400 znaków)."}
-            exclude = new.get("map_exclude", [])
-            if not isinstance(exclude, list) or len(exclude) > 50 or any(
-                    not isinstance(e, str) or not e.strip() or len(e) > 200 or ".." in e or ":" in e
-                    for e in exclude):
-                return {"ok": False, "error": "Nieprawidłowa lista wykluczonych katalogów."}
-            new["map_exclude"] = [e.strip().replace("\\", "/").strip("/") for e in exclude]
-            for model in new.get("models", {}).values():
-                if model and not is_safe_arg(model):
-                    return {"ok": False, "error": f"Nieprawidłowa nazwa modelu: {model}"}
+            if "personas" in changes:
+                error = check_personas(new["personas"])
+                if error:
+                    return {"ok": False, "error": error}
+                self._register(new["personas"])
+                # Removed specialists leave @wszyscy and the default recipient.
+                new["everyone"] = [a for a in new["everyone"] if _usable(a)]
+                if not _usable(new["target"]):
+                    new["target"] = "claude"
+            result = self._check_settings(new)
+            if not result["ok"]:
+                self._register(self.settings.get("personas", []))
+                return result
             self.settings = new
             self.save()
             return {"ok": True}
+
+    def _check_settings(self, new):
+        if any(not _usable(a) for a in new["everyone"]):
+            return {"ok": False, "error": "Nieprawidłowe ustawienie."}
+        if any(m not in MODES for m in new["modes"].values()) or new["target"] not in AGENTS or new["prompter"] not in AGENTS:
+            return {"ok": False, "error": "Nieprawidłowe ustawienie."}
+        if not isinstance(new.get("auto_fresh", True), bool) or not isinstance(new.get("map", True), bool):
+            return {"ok": False, "error": "Nieprawidłowe ustawienie."}
+        pdf_limit = new.get("pdf_limit", 30000)
+        if not isinstance(pdf_limit, int) or isinstance(pdf_limit, bool) or not 0 <= pdf_limit <= 500_000:
+            return {"ok": False, "error": "Limit tekstu z PDF-a: od 0 do 500 000 znaków."}
+        roles = new.get("roles", {})
+        if not isinstance(roles, dict) or any(a not in AGENTS or not isinstance(r, str) or len(r) > ROLE_LIMIT
+                                              for a, r in roles.items()):
+            return {"ok": False, "error": f"Nieprawidłowa rola (maks. {ROLE_LIMIT} znaków)."}
+        colors = new.get("colors", {})
+        if not isinstance(colors, dict) or any(a not in AGENTS or not isinstance(c, str) or not _COLOR.match(c)
+                                               for a, c in colors.items()):
+            return {"ok": False, "error": "Nieprawidłowy kolor."}
+        exclude = new.get("map_exclude", [])
+        if not isinstance(exclude, list) or len(exclude) > 50 or any(
+                not isinstance(e, str) or not e.strip() or len(e) > 200 or ".." in e or ":" in e
+                for e in exclude):
+            return {"ok": False, "error": "Nieprawidłowa lista wykluczonych katalogów."}
+        new["map_exclude"] = [e.strip().replace("\\", "/").strip("/") for e in exclude]
+        for model in new.get("models", {}).values():
+            if model and not is_safe_arg(model):
+                return {"ok": False, "error": f"Nieprawidłowa nazwa modelu: {model}"}
+        return {"ok": True}
 
     def new_chat(self, save_state=True):
         """Archives the current conversation; nothing is deleted. First the memory takes in
@@ -518,6 +587,8 @@ class Session:
         targets, body = parse_targets(text, default_target, everyone)
         if not targets:
             return {"ok": False, "error": "Żaden model nie bierze udziału w @wszyscy. Zmień to w Ustawieniach."}
+        if not all(_usable(t) for t in targets):
+            return {"ok": False, "error": "Nieznany model."}
         if not body:
             return {"ok": False, "error": "Wiadomość jest pusta."}
         if any(not self._attachment_path(a) for a in attachments):
@@ -561,7 +632,7 @@ class Session:
             attachments = list(plan.get("attachments") or [])
         except (TypeError, ValueError):
             return {"ok": False, "error": "Nieprawidłowe ustawienia debaty."}
-        if any(a not in AGENTS for a in agents) or (implementer and implementer not in AGENTS):
+        if any(not _usable(a) for a in agents) or (implementer and not _usable(implementer)):
             return {"ok": False, "error": "Nieznany model."}
         if len(agents) < 2:
             return {"ok": False, "error": "Do debaty potrzeba co najmniej dwóch modeli."}
@@ -762,7 +833,7 @@ class Session:
 
     def retry_with(self, agent, mode):
         """One turn with higher rights, after the user saw what the model was not allowed to do."""
-        if agent not in AGENTS or mode not in ("edit", "full"):
+        if not _usable(agent) or mode not in ("edit", "full"):
             return {"ok": False, "error": "Nieprawidłowe uprawnienia."}
         word = "edycję plików" if mode == "edit" else "pełny dostęp"
         body = (f"Pozwalam jednorazowo na {word}. Dokończ to, co poprzednio zablokowały uprawnienia, "
@@ -811,6 +882,8 @@ class Session:
                 model = self.settings["models"].get(agent) or None
                 mode = mode or self.settings["modes"].get(agent, "read")
                 role = (self.settings.get("roles") or {}).get(agent, "")
+                if agent not in BUILTIN:  # the others address it by handle, so it should know its own
+                    role = f"Jesteś {AGENTS[agent]['label']}, w czacie wołany jako @{agent}. {role}"
             if attachments:
                 body += "\n\nZałączone pliki (ścieżki względem folderu projektu):\n" + \
                     "\n".join(f"- {a}" for a in attachments)
@@ -823,7 +896,7 @@ class Session:
                                        memory=self.read_memory() if fresh else "", role=role,
                                        project_map=project_map)
             images = [self._attachment_path(a) for a in attachments
-                      if a.lower().endswith(IMAGE_SUFFIXES)] if agent == "codex" else []
+                      if a.lower().endswith(IMAGE_SUFFIXES)] if AGENTS[agent].get("family", agent) == "codex" else []
             name = session_name(self.project.name, "" if agent == "claude" else agent)
             cmd = build_command(agent, self._binaries[agent], mode, state.get("id"), model, images=images,
                                 name=name)
@@ -1185,7 +1258,7 @@ class Session:
             fresh = [rel for rel, mtime in current.items() if rel.lower().endswith(IMAGE_SUFFIXES)
                      and before.get(rel) != mtime and (rel, mtime) not in self._shown]
             self._shown.update((rel, current[rel]) for rel in fresh)  # parallel runs must not both claim it
-        if agent == "codex" and session:
+        if AGENTS[agent].get("family", agent) == "codex" and session:
             # In read-only mode the image stays here, so copy it where the chat can show it.
             source = Path.home() / ".codex" / "generated_images" / session
             for path in sorted(source.glob("*")) if source.is_dir() else []:

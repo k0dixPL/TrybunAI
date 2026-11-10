@@ -31,6 +31,7 @@
 - [Co to jest](#co-to-jest)
 - [Jak zacząć](#jak-zacząć)
 - [Funkcje](#funkcje)
+- [Specjaliści](#specjaliści)
 - [Ustawienia](#ustawienia)
 - [Okno debaty](#okno-debaty)
 - [Uprawnienia](#uprawnienia)
@@ -69,7 +70,8 @@ Potrzebne są własne konta: Claude (np. plan Pro), ChatGPT dla Codexa i/lub kon
 - **Widać, kto pracuje.** Pracujący model ma na górnym pasku świecącą pigułkę w swoim kolorze: czas pracy, bieżąca czynność (np. „Edit: ui/index.html”), kliknięcie przewija do odpowiedzi, a ✕ zatrzymuje model. Jego dymek pulsuje poświatą. Podczas aktualizacji pamięci pojawia się pigułka „Pamięć”.
 - **Zaznaczanie i kopiowanie.** Tekst odpowiedzi zaznaczysz myszą i skopiujesz jak w przeglądarce.
 - **Debaty.** Kilka modeli dyskutuje w rundach, tylko do odczytu. Potem wybrany model wdraża, a Ty zaznaczasz, co wdrożyć. Szczegóły: [Okno debaty](#okno-debaty).
-- **Role modeli.** Przy każdym modelu w Ustawieniach → Modele możesz wpisać rolę, np. „inżynier” albo „tester”. Rola trafia do promptu tego modelu. Role nie są ustawione domyślnie, wpisujesz je sam.
+- **Specjaliści, czyli zespół jak w grupie na komunikatorze.** Przycisk **＋** na dolnym pasku dodaje członka zespołu, np. `@arch`: silnik i model (np. Claude z Haiku), rola i umiejętności, kolor. Każdy ma własną rozmowę, bierze udział w debatach i może odpowiadać na `@wszyscy`. Szczegóły: [Specjaliści](#specjaliści).
+- **Role modeli.** Wbudowane modele też mają rolę, model i kolor do ustawienia: prawy klik na przycisku modelu albo Ustawienia → Modele → Edytuj. Rola trafia do promptu tego modelu.
 - **Zgody na żądanie.** Gdy model chce zrobić coś ponad swoje uprawnienia, pod odpowiedzią pojawia się kartka z tym, o co prosi. Możesz pozwolić jednorazowo.
 - **Pamięć projektu.** Zwięzłe ustalenia zamiast całej historii. Nowa sesja modelu zaczyna od pamięci, co oszczędza limity. Szczegóły: [Pamięć](#pamięć).
 - **Mapa projektu.** Krótkie notatki o kodzie: pliki, funkcje z numerami linii i dziennik zmian. Nowa sesja zaczyna od mapy, zamiast przeszukiwać cały program. Szczegóły: [Mapa](#mapa).
@@ -84,13 +86,33 @@ Potrzebne są własne konta: Claude (np. plan Pro), ChatGPT dla Codexa i/lub kon
 
 *Ustawienia → Statystyki. Claude czyta najwięcej, bo czyta cały projekt. Haiku czyta mało i jest tani. Statystyki nie oceniają, tylko liczą.*
 
+## Specjaliści
+
+Specjalista to kolejny członek zespołu z własnym `@uchwytem`. Pod spodem działa jedno z zainstalowanych narzędzi (Claude Code, Codex albo Antigravity) z wybranym modelem i rolą, którą sam opisujesz. Dzięki temu do dyskusji o projekcie dochodzi architekt, projektant UX, tester czy skarbnik, każdy w swoim kolorze.
+
+- **Dodawanie:** przycisk **＋** na dolnym pasku albo Ustawienia → Modele → „＋ Dodaj specjalistę”. Podajesz uchwyt (2–16 znaków: małe litery, cyfry, `-`, `_`), nazwę, silnik, model, rolę i kolor.
+- **Rozmowa:** `@arch` na początku wiadomości pyta architekta, `@arch @ux` obu naraz. Specjalista ma własną sesję, więc pamięta swoje wątki, a wspólny czat widzi jak każdy model.
+- **Edycja:** prawy klik na przycisku specjalisty albo Ustawienia → Modele → Edytuj. Silnika istniejącego specjalisty nie da się zmienić, bo jego rozmowa należy do konkretnego narzędzia.
+- **Uprawnienia** ustawiasz jak przy każdym modelu: wybierz go na dolnym pasku. Domyślnie „Tylko odczyt”.
+- **`@wszyscy` i debaty:** specjalistę zaznaczasz w Ustawieniach → Modele → „Kto odpowiada na @wszyscy”. W oknie debaty jest na liście uczestników i może wdrażać.
+- **Usunięcie** chowa specjalistę z paska. Jego wiadomości zostają w historii z nazwą i kolorem.
+- Specjaliści należą do projektu i zapisują się w `.trybunai/chat.json`.
+
+<p align="center"><img src="docs/zrzuty/specjalisci.png" width="760" alt="Czat ze specjalistami: Architekt, Projektantka UX i Skarbnik, każdy w swoim kolorze"></p>
+
+*Architekt liczy dni, Projektantka UX pilnuje napisów, Skarbnik zatwierdza. Na górze świeci pigułka Architekta, który właśnie tłumaczy rekurencję w testach.*
+
+<p align="center"><img src="docs/zrzuty/specjalista-edycja.png" width="400" alt="Edytor specjalisty: uchwyt, nazwa, silnik, model, rola i kolor"></p>
+
+*Skarbnik działa na Haiku. Liczy koszty, więc sam też wybrał tani model.*
+
 ## Ustawienia
 
 Ustawienia otwierasz przyciskiem **Ustawienia** na górnym pasku. Zakładki są po lewej. Zmiany zapisują się same po zamknięciu okna (✕ albo Esc).
 
 | Zakładka | Co tam jest |
 |---|---|
-| **Modele** | Silnik Prompter, kto odpowiada na `@wszyscy`, lista modeli każdego narzędzia, role modeli, limit tekstu z PDF-a |
+| **Modele** | Zespół: modele i specjaliści z rolą, modelem i kolorem, silnik Promptera, kto odpowiada na `@wszyscy`, limit tekstu z PDF-a |
 | **Pamięć** | Edycja pamięci projektu, przycisk „Zapisz stan teraz”, automatyczna świeża sesja |
 | **Mapa** | Włącznik mapy, pomijane katalogi, odświeżenie, dziennik zmian, pliki startowe |
 | **Statystyki** | Wykres i tabela zużycia tokenów |
@@ -98,7 +120,7 @@ Ustawienia otwierasz przyciskiem **Ustawienia** na górnym pasku. Zakładki są 
 | **Limity** | Plany i zużycie limitów kont, przycisk „Odśwież” |
 | **O programie** | Wersja, autor, sprawdzanie aktualizacji, instalacja nowej wersji, linki do GitHuba i strony |
 
-<p align="center"><img src="docs/zrzuty/ustawienia-modele.png" width="760" alt="Ustawienia, zakładka Modele: Prompter, kto odpowiada na @wszyscy, modele i role"></p>
+<p align="center"><img src="docs/zrzuty/ustawienia-modele.png" width="760" alt="Ustawienia, zakładka Modele: zespół z modelami i specjalistami, Prompter, kto odpowiada na @wszyscy"></p>
 
 *Codex ma rolę „tester, czepia się każdego przecinka”. Nie odpowie na pytanie o kawę. Ma pisać testy.*
 
@@ -108,8 +130,7 @@ Ustawienia otwierasz przyciskiem **Ustawienia** na górnym pasku. Zakładki są 
 |---|---|
 | Prompter używa | Wybiera narzędzie, które przepisuje notatkę na prompt (Alt+P) i aktualizuje pamięć projektu |
 | Kto odpowiada na `@wszyscy` | Zaznaczasz modele i ustalasz ich kolejność |
-| Model każdego narzędzia | Lista modeli z zainstalowanych CLI. „Domyślny” to model wybrany przez samo CLI. Przycisk „Odśwież listy modeli” wczytuje listy od nowa |
-| Rola | Krótki opis roli modelu, dopisywany do jego promptu. Haiku ma tylko pole roli, bo używa modelu Haiku z Claude Code |
+| Zespół | Wbudowane modele i specjaliści. „Edytuj” zmienia model (lista z zainstalowanych CLI albo wpisany; „domyślny” wybiera samo CLI), rolę (do 1000 znaków, dopisywana do promptu) i kolor. Haiku zawsze używa modelu Haiku. „＋ Dodaj specjalistę” dodaje członka zespołu, „Odśwież listy modeli” wczytuje listy od nowa |
 | Tekst z załączonego PDF-a, najwyżej znaków | Ile znaków tekstu z PDF-a trafia do modelu. Domyślnie 30 000, zakres 0–500 000. Wartość 0 wyłącza dołączanie tekstu PDF-ów |
 
 ### Pamięć

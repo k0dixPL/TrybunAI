@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.0.29 — 2026-11-10
+- Specjaliści: zespół jak w grupie na komunikatorze. Przycisk ＋ na dolnym pasku dodaje członka zespołu
+  z `@uchwytem`, nazwą, silnikiem (Claude, Codex, Antigravity), modelem, rolą i kolorem. Każdy ma własną
+  rozmowę, swój kolor w czacie, pigułce i statystykach, bierze udział w debatach i może być w @wszyscy.
+  Specjaliści należą do projektu (`.trybunai/chat.json`); usunięty znika z paska, ale zostaje w historii.
+- Prawy klik na przycisku modelu otwiera edytor roli, modelu i koloru, także dla wbudowanych modeli.
+- Ustawienia → Modele: lista „Zespół” z przyciskami „Edytuj” zamiast osobnych pól modelu i roli.
+  Rola może mieć do 1000 znaków (wcześniej 400).
+- README i strona projektu: opis specjalistów, nowe zrzuty czatu, edytora i zakładki Modele.
+
 ## 1.0.28 — 2026-11-10
 - Pola liczbowe (liczba rund w debacie, limit tekstu PDF) mają ciemny styl jak reszta pól; wcześniej
   były białe z jasnym, prawie niewidocznym tekstem.

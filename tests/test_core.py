@@ -437,6 +437,42 @@ class Runs(unittest.TestCase):
             time.sleep(0.02)
         self.assertFalse(self.session._busy)
 
+    def test_specialists_join_the_chat(self):
+        seen = []
+        def fake(agent, exe, mode, session=None, model=None, **k):
+            seen.append((agent, core.AGENTS[agent]["family"], model))
+            return [sys.executable, str(self.dir / "fake.py")]
+        arch = {"id": "arch", "name": "Architekt", "family": "claude"}
+        bad = [[{**arch, "id": "Arch"}], [{**arch, "id": "codex"}], [arch, arch], [{**arch, "family": "gemini"}]]
+        for personas in bad:
+            self.assertFalse(self.session.update_settings({"personas": personas})["ok"], personas)
+        self.assertNotIn("arch", core.AGENTS, "a rejected list must not stay registered")
+        self.assertTrue(self.session.update_settings({
+            "personas": [arch], "models": {"arch": "haiku"}, "roles": {"arch": "oceniasz wdrożenia"},
+            "colors": {"arch": "#12ab34"}, "everyone": ["claude", "arch"]})["ok"])
+        self.assertFalse(self.session.update_settings({"colors": {"arch": "red"}})["ok"])
+        self.assertEqual(core.parse_targets("@arch @codex hej", "claude"), (["arch", "codex"], "hej"))
+        with mock.patch.object(core, "build_command", fake):
+            self.assertTrue(self.session.send("@arch czy to się da wdrożyć?", "codex")["ok"])
+            self.wait_idle()
+        self.assertEqual(seen, [("arch", "claude", "haiku")])
+        prompt = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("@arch", prompt)
+        self.assertIn("oceniasz wdrożenia", prompt)
+        self.assertEqual(self.session.messages[-1]["agent"], "arch")
+        self.assertEqual(self.session.sessions["arch"]["id"], "abc-123", "its own conversation")
+        # Reloading the project brings the specialist back; removing hides it but keeps old messages readable.
+        again = Session(self.dir, lambda e: None, binaries={"claude": "x"})
+        self.assertEqual(again.snapshot()["agents"]["arch"]["label"], "Architekt")
+        self.assertTrue(again._binaries.get("arch"))
+        self.assertTrue(again.update_settings({"personas": [{**arch, "hidden": True}], "target": "arch"})["ok"])
+        self.assertEqual(again.settings["everyone"], ["claude"])
+        self.assertEqual(again.settings["target"], "claude")
+        self.assertEqual(core.parse_targets("@arch hej", "claude")[0], ["claude"])
+        self.assertFalse(again.send("hej", "arch")["ok"])
+        self.assertTrue(again.snapshot()["agents"]["arch"]["hidden"])
+        again.shutdown()
+
     def test_turn_saves_reply_and_session(self):
         self.assertTrue(self.session.send("@agy cześć", "claude")["ok"])
         self.wait_idle()
@@ -684,7 +720,7 @@ class Runs(unittest.TestCase):
         self.assertEqual(self.session.settings["modes"].get("antigravity", "read"), "read", "lasting rights unchanged")
         self.assertEqual(self.session.messages[-2]["grant"], "edit")
         self.assertFalse(self.session.retry_with("antigravity", "root")["ok"])
-        self.assertFalse(self.session.update_settings({"roles": {"antigravity": "x" * 401}})["ok"])
+        self.assertFalse(self.session.update_settings({"roles": {"antigravity": "x" * 1001}})["ok"])
 
     def test_menu_debate_refuses_read_only_implementer_and_warns_without_one(self):
         result, calls = self.menu_debate({"topic": "x", "agents": ["claude", "codex"], "implementer": "codex"})
