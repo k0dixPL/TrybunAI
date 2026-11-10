@@ -215,6 +215,7 @@ def main():
     window = webview.create_window(
         window_title(session.project.name), html=html, js_api=api,
         width=1100, height=820, min_size=(640, 480), background_color="#14161a",
+        text_select=True,  # pywebview domyślnie blokuje zaznaczanie tekstu w całym oknie
     )
     api._window = window
     bridge.window = window

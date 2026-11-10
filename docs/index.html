@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TrybunAI — Claude, Codex i Antigravity w jednym oknie</title>
-<meta name="description" content="Program na Windows: jeden czat dla Claude Code, Codex i Antigravity. Debaty modeli, wspólna pamięć projektu, kontrola limitów.">
+<title>TrybunAI — Claude, Codex, Antigravity i Haiku w jednym oknie</title>
+<meta name="description" content="Program na Windows: jeden czat dla Claude Code, Codex, Antigravity i Haiku. Debaty modeli, wspólna pamięć projektu, mapa kodu, statystyki i kontrola limitów.">
 <link rel="icon" href="favicon.ico">
 <style>
 :root{--bg:#14161a;--panel:#1c1f25;--line:#2c313a;--text:#e6e8eb;--dim:#9aa3ad;--accent:#3d6fd1;
@@ -57,8 +57,8 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
   </header>
 
   <div class="hero">
-    <h1>Claude, Codex i Antigravity<br><span>w jednym oknie czatu</span></h1>
-    <p>Program na Windows, który rozmawia z kilkoma modelami AI naraz w folderze Twojego projektu. Modele widzą nawzajem swoje odpowiedzi, mogą debatować, a jeden wdraża ustalenia.</p>
+    <h1>Claude, Codex, Antigravity i Haiku<br><span>w jednym oknie czatu</span></h1>
+    <p>Program na Windows, który rozmawia z kilkoma modelami AI naraz w folderze Twojego projektu. Modele widzą nawzajem swoje odpowiedzi, mogą debatować, a jeden wdraża ustalenia po Twoim wyborze.</p>
     <a class="dl" id="download" href="https://github.com/k0dixPL/TrybunAI/releases/latest/download/TrybunAI.exe">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
       Pobierz TrybunAI.exe
@@ -71,12 +71,16 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
   <section id="funkcje">
     <h2>Co potrafi</h2>
     <div class="grid">
-      <div class="card" style="--c:var(--claude)"><h3>Wspólny czat</h3><p>Piszesz <code>@claude</code>, <code>@codex</code>, <code>@agy</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p></div>
-      <div class="card" style="--c:var(--codex)"><h3>Debaty modeli</h3><p>Wybierasz uczestników, liczbę rund, kto zaczyna i kto kończy. Po debacie wybrany model wdraża ustalenia, a reszta je sprawdza.</p></div>
+      <div class="card" style="--c:var(--claude)"><h3>Wspólny czat</h3><p>Piszesz <code>@claude</code>, <code>@codex</code>, <code>@agy</code>, <code>@haiku</code> albo <code>@wszyscy</code>. Każdy model widzi, co napisali pozostali.</p></div>
+      <div class="card" style="--c:var(--codex)"><h3>Debaty modeli</h3><p>Wybierasz uczestników, liczbę rund, kto zaczyna i kto kończy. Najpierw dostajesz podsumowanie i sam zaznaczasz, co wdrożyć. Dopiero potem jeden model wdraża wybrane punkty, a reszta je sprawdza.</p></div>
       <div class="card" style="--c:var(--agy)"><h3>Pamięć projektu</h3><p>Zwięzłe ustalenia projektu zamiast ciągnięcia ogromnej historii. Długie sesje odświeżają się same, co mocno oszczędza limity.</p></div>
       <div class="card" style="--c:var(--haiku)"><h3>Limity pod kontrolą</h3><p>Plan i zużycie limitów Claude, Codex i Antigravity w jednym miejscu. Przy każdej odpowiedzi widać rozmiar kontekstu.</p></div>
       <div class="card"><h3>Uprawnienia na model</h3><p>Tylko odczyt, edycja plików albo pełny dostęp, osobno dla każdego modelu. Debaty zawsze tylko do odczytu.</p></div>
       <div class="card"><h3>Prompter</h3><p>Haiku przepisuje chaotyczną notatkę na porządny prompt, zanim go wyślesz.</p></div>
+      <div class="card"><h3>Mapa kodu</h3><p>Krótkie notatki o budowie projektu w <code>.trybunai/mapa</code>. Nowa sesja modelu zaczyna od mapy zamiast przeszukiwać cały program.</p></div>
+      <div class="card"><h3>Statystyki</h3><p>Zużycie tokenów w czasie z podziałem na modele. Liczy też sesje sprzed pierwszego uruchomienia z tą wersją.</p></div>
+      <div class="card"><h3>PDF w czacie</h3><p>Tekst z załączonego PDF-a trafia do prompta każdego modelu, także w trybie „Tylko czytaj”. Limit znaków ustawiasz w Ustawieniach.</p></div>
+      <div class="card"><h3>Zdalne sterowanie</h3><p>Opcjonalnie możesz sterować sesjami tego komputera z aplikacji Claude. Włącza się w Ustawieniach.</p></div>
     </div>
   </section>
 
@@ -87,6 +91,8 @@ footer{color:var(--dim);font-size:14px;text-align:center;padding:30px 0 40px;bor
       <li><b>Uruchom.</b> Przy pierwszym starcie przycisk <b>Instalacja</b> doinstaluje brakujące narzędzia (Claude Code, Codex, Antigravity) i po kolei otworzy okna logowania.</li>
       <li><b>Pisz.</b> Historia rozmowy i pamięć projektu zapisują się w folderze <code>.trybunai</code> obok exe.</li>
     </ol>
+    <h2 style="margin-top:34px">Ustawienia</h2>
+    <p class="lead" style="text-align:center;color:var(--dim);margin:-6px 0 18px">Przycisk <b>Ustawienia</b> na górnym pasku. Zakładki: <b>Modele</b> (role, uprawnienia, limit tekstu PDF), <b>Pamięć</b>, <b>Mapa</b>, <b>Statystyki</b>, <b>Zdalnie</b>, <b>Limity</b> i <b>O programie</b>. Pomoc jest w zakładce <b>O programie</b>; przycisk <b>?</b> na górnym pasku otwiera ją i pokazuje kropkę, gdy jest nowsza wersja.</p>
     <div class="note">Potrzebujesz własnych kont: Claude (np. plan Pro), ChatGPT dla Codexa i konta Google dla Antigravity. Wystarczy jedno z nich. Plik nie jest podpisany cyfrowo, więc Windows może pokazać ostrzeżenie SmartScreen: kliknij <b>Więcej informacji → Uruchom mimo to</b>.</div>
   </section>
 

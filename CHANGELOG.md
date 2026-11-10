@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.0.26 — 2026-11-10
+- Tekst w czacie można zaznaczyć i skopiować. Wcześniej pywebview blokował zaznaczanie w całym oknie.
+- Strona projektu (GitHub Pages) opisuje Haiku, nowe funkcje i zakładki Ustawień.
+
 ## 1.0.25 — 2026-11-10
 - **Gemini usunięty:** agent Gemini CLI, alias `@gemini`, jego domyślne włączanie w `@wszyscy`, parser, wiersz w liście modeli i kolory w statystykach. Darmowe limity Gemini się kończyły. Modele Antigravity o nazwach „gemini-…” zostają, bo to nazwy modeli w Antigravity.
 - Mechanizm „opcjonalnych” modeli (widocznych tylko przy zainstalowanym CLI) zniknął, bo był używany tylko przez Gemini.
