@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.0.27 — 2026-11-10
+- Nazwa projektu jest na środku górnego paska, pogrubiona. Kliknięcie otwiera folder projektu w Eksploratorze.
+- Usunięty wybór innego folderu z okna: jedno okno to jeden projekt, inny projekt to inne okno.
+
 ## 1.0.26 — 2026-11-10
 - Tekst w czacie można zaznaczyć i skopiować. Wcześniej pywebview blokował zaznaczanie w całym oknie.
 - Strona projektu (GitHub Pages) opisuje Haiku, nowe funkcje i zakładki Ustawień.

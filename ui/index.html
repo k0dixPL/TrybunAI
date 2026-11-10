@@ -63,7 +63,9 @@ header #project{flex-shrink:1}
 #statsimport:empty{display:none}
 header img{height:30px;width:30px}
 .empty img{display:block;width:160px;height:160px;margin:0 auto 14px}
-#project{flex:1;min-width:0;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dim);background:none;border-color:transparent}
+.grow{flex:1}
+#projectbox{display:flex;align-items:center;gap:4px;min-width:0;flex-shrink:1}
+#project{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:700;font-size:16px;color:var(--text);background:none;border-color:transparent}
 #log{flex:1;overflow-y:auto;padding:18px 14px}
 .wrap{max-width:860px;margin:0 auto}
 .empty{color:var(--dim);text-align:center;margin-top:13vh}
@@ -265,7 +267,9 @@ dialog input#mapexclude{width:250px}
 <header>
   <img class="logo" alt="" width="30" height="30">
   <b>TrybunAI</b>
-  <button id="project" title="Zmień folder projektu"></button>
+  <span class="grow"></span>
+  <div id="projectbox"><button id="project" title="Otwórz folder projektu"></button></div>
+  <span class="grow"></span>
   <div id="working" aria-live="polite"></div>
   <button id="setupbtn" class="ghost" title="Zainstaluj i zaloguj brakujące CLI">Instalacja</button>
   <button id="settings" title="Modele, pamięć, mapa, statystyki, zdalne sterowanie, limity">Ustawienia</button>
@@ -692,7 +696,7 @@ function addLine(parent, cls, text) {
 }
 function render() {
   $("items").replaceChildren();
-  $("project").textContent = S.project; $("project").title = "Zmień folder: " + S.project;
+  $("project").textContent = S.project.split(/[\\/]/).filter(Boolean).pop(); $("project").title = "Otwórz folder: " + S.project;
   if (!S.messages.length) {
     const e = document.createElement("div"); e.className = "empty";
     e.innerHTML = '<img class="logo" alt="">' + "Wybierz model poniżej albo zacznij od <code>@codex</code>, <code>@claude @agy</code>, <code>@wszyscy</code>.<br>Dyskusja między modelami: przycisk <b>Debata</b> albo <code>@debata 2 @claude @codex temat</code>.<br>Przycisk Prompter przepisze Twój tekst na prompt, zanim go wyślesz.";
@@ -1286,10 +1290,7 @@ window.addEventListener("pywebviewready", async () => {
     S.settings.modes[S.settings.target] = e.target.value;
     await api.update_settings({modes: S.settings.modes});
   };
-  $("project").onclick = async () => {
-    const r = await api.choose_project();
-    if (r.ok) await reload(); else if (r.error) toast(r.error);
-  };
+  $("project").onclick = () => api.open_project_folder();
   $("newchat").onclick = async () => {
     if (!confirm("Zacząć nową rozmowę? Ustalenia trafią do pamięci projektu, a rozmowa do archiwum w folderze .trybunai.")) return;
     const b = $("newchat"); b.disabled = true; b.textContent = "⏳"; b.title = "Zapisuję stan do pamięci projektu…";

@@ -191,14 +191,8 @@ class Api:
     def remote_stop(self):
         self._session.remote_stop()
 
-    def choose_project(self):
-        picked = self._window.create_file_dialog(webview.FileDialog.FOLDER)
-        if not picked:
-            return {"ok": False, "cancelled": True}
-        result = self._session.set_project(picked[0])
-        if result["ok"]:
-            self._window.set_title(window_title(self._session.project.name))
-        return result
+    def open_project_folder(self):
+        os.startfile(str(self._session.project))
 
     def open_link(self, url):
         if isinstance(url, str) and url.startswith(("http://", "https://")):
