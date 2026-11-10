@@ -6,7 +6,7 @@
 <title>TrybunAI</title>
 <style>
 :root{--bg:#14161a;--panel:#1c1f25;--panel2:#252932;--line:#323742;--text:#e6e8ec;--dim:#969cab;
---claude:#e08a5f;--codex:#4fbf8f;--gemini:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--antigravity:#e874b0;--danger:#e5676b;
+--claude:#e08a5f;--codex:#4fbf8f;--link:#6ea2f5;--prompter:#c18df0;--haiku:#d3bd63;--antigravity:#e874b0;--danger:#e5676b;
 --accent:#3d6fd1;--ok:#5cc98a;--warn:#e8a93a;--on-status:#14161a}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -76,9 +76,9 @@ header img{height:30px;width:30px}
 .msg>*{position:relative;z-index:1}
 @media (prefers-reduced-motion:reduce){.msg.working::before{animation:none;opacity:.55}}
 .msg.user{background:var(--panel2)}
-.msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.gemini{border-left-color:var(--gemini)}.msg.haiku{border-left-color:var(--haiku)}.msg.antigravity{border-left-color:var(--antigravity)}
+.msg.claude{border-left-color:var(--claude)}.msg.codex{border-left-color:var(--codex)}.msg.haiku{border-left-color:var(--haiku)}.msg.antigravity{border-left-color:var(--antigravity)}
 .who{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--dim);margin-bottom:3px}
-.who strong.claude{color:var(--claude)}.who strong.codex{color:var(--codex)}.who strong.gemini{color:var(--gemini)}.who strong.haiku{color:var(--haiku)}.who strong.antigravity{color:var(--antigravity)}
+.who strong.claude{color:var(--claude)}.who strong.codex{color:var(--codex)}.who strong.haiku{color:var(--haiku)}.who strong.antigravity{color:var(--antigravity)}
 .who .sp{flex:1}
 .who button{padding:0 8px;font-size:12px}
 .body>:first-child{margin-top:0}.body>:last-child{margin-bottom:0}
@@ -86,7 +86,7 @@ header img{height:30px;width:30px}
 .body h1,.body h2,.body h3,.body h4{margin:.8em 0 .3em;font-size:1.08em}
 .body ul,.body ol{margin:.4em 0;padding-left:1.5em}
 .body blockquote{margin:.5em 0;padding-left:10px;border-left:3px solid var(--line);color:var(--dim)}
-.body a{color:var(--gemini)}
+.body a{color:var(--link)}
 .body code{background:#0f1114;padding:1px 4px;border-radius:4px;font:13px Consolas,monospace}
 .code{position:relative;margin:.6em 0}
 .code pre{background:#0f1114;padding:10px 12px;border-radius:7px;overflow-x:auto;margin:0}
@@ -147,7 +147,6 @@ footer{background:var(--panel);border-top:1px solid var(--line);padding:9px 14px
 .chip{padding:2px 12px;border-radius:15px;font-size:13px}
 .chip.on.claude{background:var(--claude);border-color:var(--claude);color:#14161a}
 .chip.on.codex{background:var(--codex);border-color:var(--codex);color:#14161a}
-.chip.on.gemini{background:var(--gemini);border-color:var(--gemini);color:#14161a}
 .chip.on.haiku{background:var(--haiku);border-color:var(--haiku);color:#14161a}
 .chip.on.antigravity{background:var(--antigravity);border-color:var(--antigravity);color:#14161a}
 #setuprows div{display:flex;justify-content:space-between;margin:5px 0}
@@ -186,7 +185,7 @@ dialog label.rolerow{margin:-4px 0 12px;color:var(--dim);font-size:13px}
 dialog input.rolepick{width:340px}
 #helppane .abouthead{display:flex;gap:14px;align-items:center;margin-bottom:6px}
 #helppane .abouthead h3{margin:0 0 3px}#helppane .dim{color:var(--dim);font-size:13px}
-#helppane a{color:var(--gemini)}
+#helppane a{color:var(--link)}
 #helppane .help{font-size:14.5px;line-height:1.5}#helppane .help h4{margin:12px 0 4px}
 #helppane .help p{margin:5px 0}
 #updstate{margin:3px 0 6px}#updstate.new{color:var(--codex);font-weight:600}
@@ -389,7 +388,7 @@ dialog input#mapexclude{width:250px}
   <div id="remotestate" role="status"></div>
   <div id="remoteerr" class="err"></div>
   <p><button id="remotetoggle" type="button"></button> <button id="remotelink" type="button" hidden>Otwórz w przeglądarce</button></p>
-  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex, Antigravity i Gemini nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
+  <small>Sesje znajdziesz w aplikacji Claude (zakładka Code) i na claude.ai/code, na tym samym koncie. Claude pracuje na tym komputerze w folderze projektu i o każdą ryzykowną akcję pyta w aplikacji. Sesje są osobne: nie widać ich w tym czacie, a Codex i Antigravity nie są dostępne zdalnie. Działa, dopóki TrybunAI jest otwarty, a komputer nie śpi. Wyłączenie kończy też zdalne sesje.</small>
   </section>
   <section data-pane="limits" hidden>
   <h4>Plany i limity</h4>
@@ -706,8 +705,7 @@ function render() {
   }
   drawChips(); drawMode(); scrollDown();
 }
-// An optional model (Gemini) that is not installed stays out of sight instead of showing "(brak)".
-const shown = () => Object.entries(S.agents).filter(([, a]) => a.available || !a.optional);
+const shown = () => Object.entries(S.agents);
 function drawChips() {
   document.querySelectorAll(".chip").forEach(c => c.remove());
   const after = $("modebox");  // chips first, then the permission picker for the chosen one
@@ -961,7 +959,7 @@ async function showMap(refresh) {
 }
 
 // ---- token statistics -------------------------------------------------
-const STATS_ORDER = ["claude", "codex", "haiku", "antigravity", "gemini"];  // stacking order, checked for colour-blind contrast
+const STATS_ORDER = ["claude", "codex", "haiku", "antigravity"];  // stacking order, checked for colour-blind contrast
 const STATS_LABEL = {fresh: "nowe wejście + wyjście", all: "wszystkie tokeny", output: "wyjście"};
 let statsRange = "7d", statsData = null;
 const statsValue = (c, m) => !c ? 0 : m === "output" ? c.output : m === "all" ? c.input + c.cached + c.output : c.input + c.output;
@@ -1386,7 +1384,7 @@ window.addEventListener("pywebviewready", async () => {
   $("input").focus();
   setTimeout(() => api.about().then(a => { about = a; checkUpdate(); }), 3000);  // quiet check; offline is fine
   // A new laptop: show what is missing straight away.
-  if (Object.values(S.agents).some(a => !a.available && !a.optional)) $("setupbtn").click();
+  if (Object.values(S.agents).some(a => !a.available)) $("setupbtn").click();
 });
 </script>
 </body>

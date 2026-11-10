@@ -13,15 +13,13 @@ AGENTS = {
     # Google's successor to Gemini CLI for personal accounts (free tier with limits).
     "antigravity": {"label": "Antigravity", "binary": "agy",
                     "fallback": os.path.join(os.environ.get("LOCALAPPDATA", ""), "agy", "bin", "agy.exe")},
-    # Since June 2026 Gemini CLI only serves API keys, so it is shown only once installed.
-    "gemini": {"label": "Gemini", "binary": "gemini", "optional": True},
     # Same CLI as Claude, cheaper and faster model, its own conversation.
     "haiku": {"label": "Haiku", "binary": "claude", "family": "claude", "model": "haiku"},
 }
 MODES = ("read", "edit", "full")
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
 
-# Gemini's npm shim is a .cmd, which goes through cmd.exe. The prompt always
+# npm shims (.cmd) go through cmd.exe. The prompt always
 # travels over stdin, and everything else placed on the command line is validated.
 _SAFE_ARG = re.compile(r"^[\w.:\-\[\]]+$")
 
@@ -108,12 +106,6 @@ def build_command(agent_id, exe, mode="read", session=None, model=None, prompter
             cmd += ["-c", f'sandbox_mode="{sandbox}"', "-c", 'windows.sandbox="unelevated"']
             if prompter:
                 cmd.append("--ephemeral")
-    elif family == "gemini":
-        cmd = [exe, "-o", "stream-json", "--skip-trust", "-p", ""]
-        approval = {"read": "default", "edit": "auto_edit", "full": "yolo"}[mode]
-        cmd += ["--approval-mode", "default" if prompter else approval]
-        if session:
-            cmd += ["--resume", session]
     elif family == "antigravity":
         # agy.exe is a real exe, not a .cmd shim, so the JSON argument does not pass through cmd.exe.
         cmd = [exe, "--input-format", "stream-json", "--output-format", "stream-json"]
@@ -181,7 +173,7 @@ def parse_event(agent_id, obj):
     """
     if not isinstance(obj, dict):
         return []
-    return {"claude": _parse_claude, "codex": _parse_codex, "gemini": _parse_gemini,
+    return {"claude": _parse_claude, "codex": _parse_codex,
             "antigravity": _parse_antigravity}[_family(agent_id)](obj)
 
 
@@ -260,25 +252,6 @@ def _parse_codex(o):
         return [("activity", f"pliki: {_shorten(', '.join(paths))}")]
     if kind == "item.started" and itype in ("mcp_tool_call", "web_search"):
         return [("activity", _shorten(item.get("tool") or item.get("query") or itype))]
-    return []
-
-
-def _parse_gemini(o):
-    kind = o.get("type")
-    if kind == "init":
-        return [("session", o.get("session_id"))]
-    if kind == "message" and o.get("role") == "assistant":
-        return [("text", o.get("content") or "")]
-    if kind == "tool_use":
-        return [("break", None), ("activity", _tool_summary(o.get("tool_name"), o.get("parameters")))]
-    if kind == "error":
-        return [("warn", str(o.get("message", "")))]
-    if kind == "result" and isinstance(o.get("stats"), dict):
-        stats = o["stats"]
-        return [_split_tokens("result", stats, "cached")] + _parse_gemini({**o, "stats": None})
-    if kind == "result" and o.get("status") == "error":
-        err = o.get("error") or {}
-        return [("fatal", str(err.get("message") if isinstance(err, dict) else err))]
     return []
 
 

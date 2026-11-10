@@ -90,4 +90,4 @@ def collect(binaries, refresh=False):
                 except OSError:
                     pass
     claude_list = claude()
-    return {"claude": claude_list, "haiku": claude_list, "codex": codex(), "antigravity": agy, "gemini": []}
+    return {"claude": claude_list, "haiku": claude_list, "codex": codex(), "antigravity": agy}

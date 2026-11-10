@@ -3,7 +3,7 @@
 Works in a normal folder next to this script: Python's tempfile creates owner-only
 ACLs on Windows, which the Codex sandbox cannot read, so it would give false failures.
 
-Run: .venv\\Scripts\\python e2e_live.py [claude codex gemini]
+Run: .venv\\Scripts\\python e2e_live.py [claude codex antigravity]
 """
 import shutil
 import sys

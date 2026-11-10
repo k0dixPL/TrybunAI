@@ -33,18 +33,18 @@ if "WERDYKT: AKCEPTUJĘ" in data:  # a reviewer: remarks first, acceptance on th
     reply = "dobrze\nWERDYKT: AKCEPTUJĘ" if "ponowne sprawdzenie" in data else "błąd w pliku\nWERDYKT: UWAGI"
 if "PROPOZYCJE" in data:  # a debate summary
     reply = "Stanęło na JSON.\n\n**PROPOZYCJE:**\n1. Zapis do settings.json\n2. **Pole schema** (sporne)\n3. Migracja"
-print(json.dumps({"type": "init", "session_id": "abc-123"}))
-print(json.dumps({"type": "message", "role": "assistant", "content": reply, "delta": True}), flush=True)
-print(json.dumps({"type": "result", "status": "success"}))
+print(json.dumps({"event": "init", "conversation_id": "abc-123"}))
+print(json.dumps({"event": "step_update", "step_update": {"step_type": "agent_response", "text_delta": reply}}), flush=True)
+print(json.dumps({"event": "result", "result": {"status": "SUCCESS"}}))
 """
 
 
 class Pure(unittest.TestCase):
     def test_mentions_only_at_start(self):
-        self.assertEqual(parse_targets("@codex @claude zrób", "gemini"), (["codex", "claude"], "zrób"))
-        self.assertEqual(parse_targets("zapytaj @codex o to", "gemini"), (["gemini"], "zapytaj @codex o to"))
-        self.assertEqual(parse_targets("@wszyscy hej", "claude", ["claude", "codex", "gemini"])[0],
-                         ["claude", "codex", "gemini"])
+        self.assertEqual(parse_targets("@codex @claude zrób", "antigravity"), (["codex", "claude"], "zrób"))
+        self.assertEqual(parse_targets("zapytaj @codex o to", "antigravity"), (["antigravity"], "zapytaj @codex o to"))
+        self.assertEqual(parse_targets("@wszyscy hej", "claude", ["claude", "codex", "antigravity"])[0],
+                         ["claude", "codex", "antigravity"])
         self.assertEqual(parse_targets("@nieznany hej", "claude"), (["claude"], "@nieznany hej"))
 
     def test_context_skips_own_and_failed_messages(self):
@@ -52,7 +52,7 @@ class Pure(unittest.TestCase):
             {"role": "user", "targets": ["claude"], "text": "pytanie"},
             {"role": "assistant", "agent": "claude", "text": "odp claude", "status": "ok"},
             {"role": "assistant", "agent": "codex", "text": "moja", "status": "ok"},
-            {"role": "assistant", "agent": "gemini", "text": "zepsute", "status": "error"},
+            {"role": "assistant", "agent": "antigravity", "text": "zepsute", "status": "error"},
         ]
         prompt = build_turn_prompt(msgs, "codex", "dalej")
         self.assertIn("odp claude", prompt)
@@ -71,8 +71,7 @@ class Pure(unittest.TestCase):
     def test_read_only_never_grants_write(self):
         self.assertIn("dontAsk", build_command("claude", "c", "read"))
         self.assertIn('sandbox_mode="read-only"', build_command("codex", "c", "read"))
-        self.assertIn("default", build_command("gemini", "c", "read"))
-        for agent in ("claude", "codex", "gemini"):
+        for agent in ("claude", "codex", "antigravity"):
             joined = " ".join(build_command(agent, "c", "full", prompter=True))
             for flag in ("dangerously", "yolo", "workspace-write", "acceptEdits"):
                 self.assertNotIn(flag, joined)
@@ -86,9 +85,9 @@ class Pure(unittest.TestCase):
     def test_unsafe_values_rejected(self):
         for bad in ("x & calc", 'a"b', "a|b", "a b"):
             with self.assertRaises(ValueError):
-                build_command("gemini", "c", model=bad)
+                build_command("antigravity", "c", model=bad)
             with self.assertRaises(ValueError):
-                build_command("gemini", "c", session=bad)
+                build_command("antigravity", "c", session=bad)
 
     def test_parsers(self):
         self.assertEqual(parse_event("claude", {"type": "stream_event", "event": {
@@ -98,7 +97,7 @@ class Pure(unittest.TestCase):
         self.assertEqual(parse_event("claude", {"type": "result", "is_error": True, "result": "x"}), [("fatal", "x")])
         self.assertEqual(parse_event("codex", {"type": "thread.started", "thread_id": "t"}), [("session", "t")])
         self.assertEqual(parse_event("codex", {"type": "turn.failed", "error": {"message": "m"}}), [("fatal", "m")])
-        self.assertEqual(parse_event("gemini", {"type": "result", "status": "error", "error": {"message": "m"}}),
+        self.assertEqual(parse_event("antigravity", {"event": "result", "result": {"status": "FAILED", "error": "m"}}),
                          [("fatal", "m")])
 
     def test_crash_dump_reduced_to_cause(self):
@@ -113,27 +112,19 @@ class Pure(unittest.TestCase):
         message = result.error_message()
         self.assertNotIn("file:///", message)
         self.assertNotIn("256-color", message)
-        self.assertIn("GEMINI_API_KEY", message)
 
     def test_everyone_respects_exclusions(self):
-        self.assertEqual(parse_targets("@wszyscy hej", "gemini", ["claude", "codex"]), (["claude", "codex"], "hej"))
-        self.assertEqual(parse_targets("@gemini hej", "claude", ["claude"]), (["gemini"], "hej"), "direct mention wins")
-        self.assertEqual(parse_targets("@wszyscy @gemini hej", "claude", ["codex"])[0], ["codex", "gemini"])
+        self.assertEqual(parse_targets("@wszyscy hej", "antigravity", ["claude", "codex"]), (["claude", "codex"], "hej"))
+        self.assertEqual(parse_targets("@agy hej", "claude", ["claude"]), (["antigravity"], "hej"), "direct mention wins")
+        self.assertEqual(parse_targets("@wszyscy @agy hej", "claude", ["codex"])[0], ["codex", "antigravity"])
         self.assertEqual(parse_targets("@wszyscy hej", "claude", []), ([], "hej"), "must not fall back to default")
-
-    def test_gemini_joins_everyone_by_default_only_with_key(self):
-        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "x"}):
-            self.assertIn("gemini", core.default_everyone())
-        env = {k: v for k, v in os.environ.items() if k != "GEMINI_API_KEY"}
-        with mock.patch.dict(os.environ, env, clear=True):
-            self.assertEqual(core.default_everyone(), ["claude", "codex", "antigravity"])
 
     def test_debate_parsing(self):
         team = ["claude", "codex"]
         self.assertIsNone(parse_debate("@claude co to @debata", team))
         self.assertIsNone(parse_debate("@debatax 3 temat", team))
-        self.assertEqual(parse_debate("@debata 2 @gemini @codex baza czy pliki", team),
-                         {"rounds": 2, "agents": ["gemini", "codex"], "topic": "baza czy pliki"})
+        self.assertEqual(parse_debate("@debata 2 @agy @codex baza czy pliki", team),
+                         {"rounds": 2, "agents": ["antigravity", "codex"], "topic": "baza czy pliki"})
         self.assertEqual(parse_debate("@debata temat", team), {"rounds": 3, "agents": team, "topic": "temat"})
         self.assertEqual(parse_debate("@debata 3 lata temu", team)["topic"], "lata temu")
         for bad in ("@debata 0 temat", "@debata 11 temat", "@debata @claude temat", "@debata 2 @claude @codex", "@debata"):
@@ -220,7 +211,7 @@ class Pure(unittest.TestCase):
                          "one call split over two events counts once")
         self.assertEqual(result.token_total(), {"input": 1002, "cached": 437000, "output": 50})
 
-    def test_token_counts_from_codex_antigravity_and_gemini(self):
+    def test_token_counts_from_codex_and_antigravity(self):
         codex = {"type": "turn.completed", "usage": {"input_tokens": 9000, "cached_input_tokens": 7000,
                                                      "output_tokens": 300}}
         self.assertEqual(parse_event("codex", codex),
@@ -229,9 +220,6 @@ class Pure(unittest.TestCase):
                "conversation_id": "c", "step_index": 3, "usage": {"input_tokens": 500, "output_tokens": 40}}}
         self.assertIn(("tokens", {"call": "c:3", "input": 500, "cached": 0, "output": 40}),
                       parse_event("antigravity", agy))
-        gem = {"type": "result", "status": "success", "stats": {"input_tokens": 100, "cached": 30, "output_tokens": 5}}
-        self.assertEqual(parse_event("gemini", gem), [("tokens", {"call": "result", "input": 70, "cached": 30,
-                                                                  "output": 5})])
         bad = {"type": "turn.completed", "usage": {"input_tokens": "x"}}
         self.assertEqual(parse_event("codex", bad)[0][1]["input"], 0, "junk never breaks a turn")
 
@@ -430,14 +418,14 @@ class Runs(unittest.TestCase):
         script = self.dir / "fake.py"
         script.write_text(FAKE, encoding="utf-8")
         self.events = []
-        self.session = Session(self.dir, self.events.append, binaries={"gemini": "x", "claude": "x", "codex": "x", "haiku": "x"})
+        self.session = Session(self.dir, self.events.append, binaries={"antigravity": "x", "claude": "x", "codex": "x", "haiku": "x"})
         self.assertEqual(self.session.settings["prompter"], "haiku")
         patcher = mock.patch.object(core, "build_command",
                                     lambda agent, *a, **k: [sys.executable, str(script)])
         patcher.start()
         self.addCleanup(patcher.stop)
-        # The fake CLI speaks Gemini's dialect whichever agent it stands in for.
-        dialect = mock.patch.object(core, "parse_event", lambda agent, obj: parse_event("gemini", obj))
+        # The fake CLI speaks Antigravity's dialect whichever agent it stands in for.
+        dialect = mock.patch.object(core, "parse_event", lambda agent, obj: parse_event("antigravity", obj))
         dialect.start()
         self.addCleanup(dialect.stop)
         self.addCleanup(self.tmp.cleanup)
@@ -450,16 +438,16 @@ class Runs(unittest.TestCase):
         self.assertFalse(self.session._busy)
 
     def test_turn_saves_reply_and_session(self):
-        self.assertTrue(self.session.send("@gemini cześć", "claude")["ok"])
+        self.assertTrue(self.session.send("@agy cześć", "claude")["ok"])
         self.wait_idle()
         self.assertEqual(self.session.messages[-1]["text"], "odp zażółć")
-        self.assertEqual(self.session.sessions["gemini"], {"id": "abc-123", "seen": 1})
+        self.assertEqual(self.session.sessions["antigravity"], {"id": "abc-123", "seen": 1})
         saved = json.loads((self.dir / ".trybunai" / "chat.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["messages"][-1]["status"], "ok")
         self.assertTrue((self.dir / ".trybunai" / ".gitignore").exists())
 
     def test_second_model_receives_first_models_reply_once(self):
-        self.session.send("@gemini pierwsze", "claude")
+        self.session.send("@agy pierwsze", "claude")
         self.wait_idle()
         self.session.send("@claude drugie", "claude")
         self.wait_idle()
@@ -471,33 +459,33 @@ class Runs(unittest.TestCase):
         self.assertEqual(again, "trzecie")
 
     def test_failure_is_reported_with_login_hint(self):
-        self.session.send("@gemini ZLE", "claude")
+        self.session.send("@agy ZLE", "claude")
         self.wait_idle()
         msg = self.session.messages[-1]
         self.assertEqual(msg["status"], "error")
         self.assertIn("zaloguj", msg["error"])
 
     def test_stop_kills_process(self):
-        self.session.send("@gemini ZAWIS", "claude")
+        self.session.send("@agy ZAWIS", "claude")
         deadline = time.time() + 10
-        while "gemini" not in self.session._procs and time.time() < deadline:
+        while "antigravity" not in self.session._procs and time.time() < deadline:
             time.sleep(0.01)
         started = time.time()
-        self.session.stop("gemini")
+        self.session.stop("antigravity")
         self.wait_idle()
         self.assertLess(time.time() - started, 15)
         self.assertEqual(self.session.messages[-1]["status"], "stopped")
 
     def test_stop_after_process_ended_does_not_kill_next_reply(self):
         def late_stop(*args, **kwargs):  # the process has ended, the agent is still busy
-            self.session.stop("gemini")
+            self.session.stop("antigravity")
             return []
 
         with mock.patch.object(self.session, "_collect_images", side_effect=late_stop):
-            self.session.send("@gemini pierwsze", "claude")
+            self.session.send("@agy pierwsze", "claude")
             self.wait_idle()
         self.assertEqual(self.session.messages[-1]["status"], "ok")
-        self.session.send("@gemini drugie", "claude")
+        self.session.send("@agy drugie", "claude")
         self.wait_idle()
         self.assertEqual(self.session.messages[-1]["status"], "ok")
         self.assertEqual(self.session.messages[-1]["text"], "odp zażółć")
@@ -506,7 +494,7 @@ class Runs(unittest.TestCase):
         folder = self.dir / ".trybunai"
         folder.mkdir(exist_ok=True)
         (folder / "chat.json").write_text("{nie json", encoding="utf-8")
-        session = Session(self.dir, self.events.append, binaries={"gemini": "x"})
+        session = Session(self.dir, self.events.append, binaries={"antigravity": "x"})
         self.addCleanup(session.shutdown)
         self.assertEqual(session.messages, [])
         kept = list(folder.glob("chat-uszkodzony-*.json"))
@@ -534,12 +522,12 @@ class Runs(unittest.TestCase):
         self.assertEqual(text, f"Treść załącznika {rel} [tekst ucięty do limitu]:\nabcdef\ng")
 
     def test_second_send_while_busy_refused(self):
-        self.session.send("@gemini ZAWIS", "claude")
-        self.assertFalse(self.session.send("@gemini znowu", "claude")["ok"])
+        self.session.send("@agy ZAWIS", "claude")
+        self.assertFalse(self.session.send("@agy znowu", "claude")["ok"])
         deadline = time.time() + 10
-        while "gemini" not in self.session._procs and time.time() < deadline:
+        while "antigravity" not in self.session._procs and time.time() < deadline:
             time.sleep(0.01)
-        self.session.stop("gemini")
+        self.session.stop("antigravity")
         self.wait_idle()
 
     def test_each_agent_has_its_own_mode(self):
@@ -549,27 +537,27 @@ class Runs(unittest.TestCase):
             return [sys.executable, str(self.dir / "fake.py")]
         self.session.update_settings({"modes": {"codex": "edit"}})
         with mock.patch.object(core, "build_command", fake):
-            self.session.send("@codex @gemini hej", "claude")
+            self.session.send("@codex @agy hej", "claude")
             self.wait_idle()
-        self.assertEqual(seen, {"codex": "edit", "gemini": "read"})
+        self.assertEqual(seen, {"codex": "edit", "antigravity": "read"})
 
     def test_excluded_model_is_skipped_and_saved(self):
-        self.session.update_settings({"everyone": ["gemini"]})
+        self.session.update_settings({"everyone": ["antigravity"]})
         self.session.send("@wszyscy hej", "claude")
         self.wait_idle()
-        self.assertEqual(self.session.messages[0]["targets"], ["gemini"])
+        self.assertEqual(self.session.messages[0]["targets"], ["antigravity"])
         self.session.load()
-        self.assertEqual(self.session.settings["everyone"], ["gemini"])
+        self.assertEqual(self.session.settings["everyone"], ["antigravity"])
 
     def test_everyone_empty_or_not_installed_is_refused(self):
         self.session.update_settings({"everyone": []})
         self.assertFalse(self.session.send("@wszyscy hej", "claude")["ok"])
         self.assertEqual(self.session.messages, [])
-        self.session.update_settings({"everyone": ["claude", "gemini"]})
+        self.session.update_settings({"everyone": ["claude", "antigravity"]})
         self.session._binaries["claude"] = None
         self.session.send("@wszyscy hej", "codex")
         self.wait_idle()
-        self.assertEqual(self.session.messages[0]["targets"], ["gemini"])
+        self.assertEqual(self.session.messages[0]["targets"], ["antigravity"])
 
     def debate(self, text, script=None):
         calls = []
@@ -602,11 +590,11 @@ class Runs(unittest.TestCase):
 
     def test_menu_debate_order_then_implement_then_review(self):
         self.session.update_settings({"modes": {"claude": "full"}})
-        result, calls = self.menu_debate({"topic": "plan gry", "agents": ["codex", "gemini", "claude"], "rounds": 2,
+        result, calls = self.menu_debate({"topic": "plan gry", "agents": ["codex", "antigravity", "claude"], "rounds": 2,
                                           "implementer": "claude", "review": True, "fix_rounds": 0, "confirm": False})
         self.assertTrue(result["ok"])
-        self.assertEqual(calls, [("codex", "read"), ("gemini", "read"), ("claude", "read")] * 2 +
-                         [("claude", "full"), ("codex", "read"), ("gemini", "read")],
+        self.assertEqual(calls, [("codex", "read"), ("antigravity", "read"), ("claude", "read")] * 2 +
+                         [("claude", "full"), ("codex", "read"), ("antigravity", "read")],
                          "speaking order as chosen, implementer with its own rights, reviewers read-only")
         labels = [m.get("label") for m in self.session.messages if m["role"] == "assistant"]
         self.assertEqual(labels[-3:], ["wdrożenie", "sprawdzenie", "sprawdzenie"])
@@ -674,29 +662,29 @@ class Runs(unittest.TestCase):
 
     def test_blocked_actions_offer_a_one_time_retry(self):
         def parse(agent, obj):
-            events = parse_event("gemini", obj)
-            if obj.get("type") == "result":
+            events = parse_event("antigravity", obj)
+            if obj.get("event") == "result":
                 events.append(("denied", {"tool": "Write", "detail": "Write: a.html", "needs": "edit"}))
             return events
         seen = []
         def fake(agent, exe, mode, *a, **k):
             seen.append(mode)
             return [sys.executable, str(self.dir / "fake.py")]
-        self.session.update_settings({"roles": {"gemini": "tester gry"}})
+        self.session.update_settings({"roles": {"antigravity": "tester gry"}})
         with mock.patch.object(core, "parse_event", parse), mock.patch.object(core, "build_command", fake):
-            self.session.send("@gemini zapisz plik", "claude")
+            self.session.send("@agy zapisz plik", "claude")
             self.wait_idle()
             self.assertIn("Twoja stała rola w tym zespole (ustawił ją użytkownik): tester gry",
                           (self.dir / "last_prompt.txt").read_text(encoding="utf-8"))
             msg = self.session.messages[-1]
             self.assertEqual((msg["needs"], msg["denied"][0]["tool"]), ("edit", "Write"))
-            self.assertTrue(self.session.retry_with("gemini", "edit")["ok"])
+            self.assertTrue(self.session.retry_with("antigravity", "edit")["ok"])
             self.wait_idle()
         self.assertEqual(seen, ["read", "edit"], "the retry runs once with the granted mode")
-        self.assertEqual(self.session.settings["modes"].get("gemini", "read"), "read", "lasting rights unchanged")
+        self.assertEqual(self.session.settings["modes"].get("antigravity", "read"), "read", "lasting rights unchanged")
         self.assertEqual(self.session.messages[-2]["grant"], "edit")
-        self.assertFalse(self.session.retry_with("gemini", "root")["ok"])
-        self.assertFalse(self.session.update_settings({"roles": {"gemini": "x" * 401}})["ok"])
+        self.assertFalse(self.session.retry_with("antigravity", "root")["ok"])
+        self.assertFalse(self.session.update_settings({"roles": {"antigravity": "x" * 401}})["ok"])
 
     def test_menu_debate_refuses_read_only_implementer_and_warns_without_one(self):
         result, calls = self.menu_debate({"topic": "x", "agents": ["claude", "codex"], "implementer": "codex"})
@@ -708,28 +696,29 @@ class Runs(unittest.TestCase):
         self.assertIn("tylko do odczytu", result["warn"])
 
     def test_fresh_session_starts_from_memory_and_last_exchange(self):
-        self.session.send("@gemini pierwsze", "claude")
+        self.session.send("@agy pierwsze", "claude")
         self.wait_idle()
-        self.assertTrue(self.session.fresh_session("gemini")["ok"])
+        self.assertTrue(self.session.fresh_session("antigravity")["ok"])
         self.wait_idle()
         summary = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
         self.assertIn("pierwsze", summary, "the summarizer reads the chat")
         self.assertEqual(self.session.read_memory().strip(), "odp zażółć")
-        self.assertEqual(self.session.sessions["gemini"], {"seen": 0})
-        self.assertTrue(any(e["t"] == "fresh" and e["agents"] == ["gemini"] for e in self.events))
-        self.session.send("@gemini drugie", "claude")
+        self.assertEqual(self.session.sessions["antigravity"], {"seen": 0})
+        self.assertTrue(any(e["t"] == "fresh" and e["agents"] == ["antigravity"] for e in self.events))
+        self.session.send("@agy drugie", "claude")
         self.wait_idle()
-        prompt = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
+        # Antigravity sends the prompt as one JSON line, so the newlines are escaped inside it.
+        prompt = json.loads((self.dir / "last_prompt.txt").read_text(encoding="utf-8"))["message"]["content"]
         self.assertIn("<pamiec_projektu>\nodp zażółć", prompt)
         self.assertIn("pierwsze", prompt, "the last exchange is replayed, own reply included")
         self.session.new_chat()
-        self.session.send("@gemini po nowej rozmowie", "claude")
+        self.session.send("@agy po nowej rozmowie", "claude")
         self.wait_idle()
         self.assertIn("pamiec_projektu", (self.dir / "last_prompt.txt").read_text(encoding="utf-8"),
                       "the memory outlives a new chat")
 
     def test_save_state_keeps_sessions_and_new_chat_saves_first(self):
-        self.session.send("@gemini ustalamy coś", "claude")
+        self.session.send("@agy ustalamy coś", "claude")
         self.wait_idle()
         self.session.write_memory("## Nie ruszać\n- misje mają jedną niewiadomą")
         result = self.session.save_state()
@@ -738,7 +727,7 @@ class Runs(unittest.TestCase):
         self.assertIn("misje mają jedną niewiadomą", prompt, "the old memory, mines included, is the base")
         self.assertIn("Nie ruszać", prompt)
         self.assertEqual(result["memory"].strip(), "odp zażółć")
-        self.assertEqual(self.session.sessions["gemini"]["id"], "abc-123", "saving state resets nothing")
+        self.assertEqual(self.session.sessions["antigravity"]["id"], "abc-123", "saving state resets nothing")
         self.session.write_memory("")
         self.session._binaries["haiku"] = None
         result = self.session.new_chat()
@@ -746,58 +735,58 @@ class Runs(unittest.TestCase):
         self.assertIn("Nie udało się", result["warn"])
         self.assertEqual(self.session.messages, [])
         self.session._binaries["haiku"] = "x"
-        self.session.send("@gemini hej", "claude")
+        self.session.send("@agy hej", "claude")
         self.wait_idle()
         self.assertTrue(self.session.new_chat()["ok"])
         self.assertEqual(self.session.read_memory().strip(), "odp zażółć", "a new chat saves the state first")
 
     def big_context(self):
         def parse(agent, obj):
-            events = parse_event("gemini", obj)
-            if obj.get("type") == "result":
+            events = parse_event("antigravity", obj)
+            if obj.get("event") == "result":
                 events.append(("usage", {"call": "c", "model": None, "context": core.CONTEXT_WARN + 1}))
             return events
         return mock.patch.object(core, "parse_event", parse)
 
     def test_every_run_is_written_to_token_statistics(self):
         def parse(agent, obj):
-            events = parse_event("gemini", obj)
-            if obj.get("type") == "result":
+            events = parse_event("antigravity", obj)
+            if obj.get("event") == "result":
                 events.append(("tokens", {"call": "c", "input": 120, "cached": 800, "output": 30}))
             return events
         with mock.patch.object(core, "parse_event", parse):
-            self.session.send("@gemini hej", "claude")
+            self.session.send("@agy hej", "claude")
             self.wait_idle()
             rows = stats.read(self.dir / core.STATE_DIR)
             self.session.new_chat()  # the memory update is a second run
         self.assertEqual([r["kind"] for r in stats.read(self.dir / core.STATE_DIR)], ["czat", "pamięć"],
                          "statistics outlive a new chat")
         self.assertEqual([(r["agent"], r["kind"], r["input"], r["cached"], r["output"]) for r in rows],
-                         [("gemini", "czat", 120, 800, 30)])
+                         [("antigravity", "czat", 120, 800, 30)])
         totals = self.session.token_stats("24h")["totals"]
-        self.assertEqual((totals["gemini"]["output"], totals["haiku"]["output"]), (30, 30),
+        self.assertEqual((totals["antigravity"]["output"], totals["haiku"]["output"]), (30, 30),
                          "the memory run counts for its engine")
 
     def test_oversized_session_is_replaced_automatically(self):
         with self.big_context():
-            self.session.send("@gemini duża sesja", "claude")
+            self.session.send("@agy duża sesja", "claude")
             self.wait_idle()
         self.assertEqual(self.session.read_memory().strip(), "odp zażółć")
-        self.assertNotIn("id", self.session.sessions["gemini"])
+        self.assertNotIn("id", self.session.sessions["antigravity"])
         self.assertEqual(self.session.messages[-1]["usage"]["context"], core.CONTEXT_WARN + 1)
 
     def test_auto_refresh_can_be_off_and_keeps_session_when_memory_fails(self):
         self.session.update_settings({"auto_fresh": False})
         with self.big_context():
-            self.session.send("@gemini duża sesja", "claude")
+            self.session.send("@agy duża sesja", "claude")
             self.wait_idle()
-        self.assertEqual(self.session.sessions["gemini"]["id"], "abc-123")
+        self.assertEqual(self.session.sessions["antigravity"]["id"], "abc-123")
         self.session.update_settings({"auto_fresh": True})
         self.session._binaries["haiku"] = None  # the summarizer cannot run
         with self.big_context():
-            self.session.send("@gemini znowu", "claude")
+            self.session.send("@agy znowu", "claude")
             self.wait_idle()
-        self.assertEqual(self.session.sessions["gemini"]["id"], "abc-123", "no memory, so no automatic reset")
+        self.assertEqual(self.session.sessions["antigravity"]["id"], "abc-123", "no memory, so no automatic reset")
         self.assertTrue(any(e["t"] == "fresh" and "Nie udało się" in e["text"] for e in self.events))
         self.assertFalse(self.session.update_settings({"auto_fresh": "tak"})["ok"])
 
@@ -822,12 +811,12 @@ class Runs(unittest.TestCase):
             deadline = time.time() + 10
             while "claude" not in self.session._procs and time.time() < deadline:
                 time.sleep(0.01)
-            self.assertFalse(self.session.send("@gemini hej", "claude")["ok"], "nothing interleaves")
+            self.assertFalse(self.session.send("@agy hej", "claude")["ok"], "nothing interleaves")
             self.session.stop("claude")
             self.wait_idle()
         self.assertEqual(len([m for m in self.session.messages if m["role"] == "assistant"]), 1)
         self.assertFalse(self.session._stop_requested)
-        self.assertTrue(self.session.send("@gemini hej", "claude")["ok"], "usable again afterwards")
+        self.assertTrue(self.session.send("@agy hej", "claude")["ok"], "usable again afterwards")
         self.wait_idle()
 
     def test_old_single_mode_file_is_migrated(self):
@@ -841,7 +830,7 @@ class Runs(unittest.TestCase):
         script.write_text(FAKE + "\nopen('nowy.png','wb').write(b'x')\n", encoding="utf-8")
         (self.dir / "stary.png").write_bytes(b"old")
         with mock.patch.object(core, "build_command", lambda *a, **k: [sys.executable, str(script)]):
-            self.session.send("@gemini rysuj", "claude")
+            self.session.send("@agy rysuj", "claude")
             self.wait_idle()
         self.assertEqual(self.session.messages[-1]["images"], ["nowy.png"])
 
@@ -857,14 +846,14 @@ class Runs(unittest.TestCase):
     def test_attachment_reaches_prompt_and_rejects_foreign_paths(self):
         attached = self.session.attach_bytes("zdjęcie 1.png", "eA==")
         self.assertTrue(attached["ok"])
-        self.assertFalse(self.session.send("@gemini hej", "claude", ["fake.py"])["ok"])
-        self.session.send("@gemini hej", "claude", [attached["path"]])
+        self.assertFalse(self.session.send("@agy hej", "claude", ["fake.py"])["ok"])
+        self.session.send("@agy hej", "claude", [attached["path"]])
         self.wait_idle()
         prompt = (self.dir / "last_prompt.txt").read_text(encoding="utf-8")
         self.assertIn(attached["path"], prompt)
 
     def test_new_chat_archives(self):
-        self.session.send("@gemini cześć", "claude")
+        self.session.send("@agy cześć", "claude")
         self.wait_idle()
         self.assertTrue(self.session.new_chat()["ok"])
         self.assertEqual(self.session.messages, [])
@@ -959,7 +948,7 @@ class Installer(unittest.TestCase):
         self.assertTrue(any("nieukończone" in line for line in log))
 
     def test_login_window_closes_itself_once_logged_in(self):
-        # A console that would otherwise wait a minute, like Gemini sitting in its chat after login.
+        # A console that would otherwise wait a minute, like a CLI sitting in its chat after login.
         cmd = ["cmd.exe", "/c", "ping -n 60 127.0.0.1 >nul"]
         checks = []
         started = time.time()

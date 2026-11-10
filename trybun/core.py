@@ -33,19 +33,18 @@ NO_WINDOW = subprocess.CREATE_NO_WINDOW
 _STRIP_ENV = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT", "_MEIPASS2")
 
 _MENTION = re.compile(r"^\s*@([\w-]+)[\s,:]*")
-_ALIASES = {"claude": ["claude"], "codex": ["codex"], "gemini": ["gemini"],
+_ALIASES = {"claude": ["claude"], "codex": ["codex"],
             "haiku": ["haiku"], "antigravity": ["antigravity"], "agy": ["antigravity"]}
 _LOST_SESSION = re.compile(
     r"(no (conversation|session|thread|rollout)|(session|thread|conversation).{0,40}not found"
     r"|invalid session identifier)", re.I)
-_INELIGIBLE = re.compile(r"IneligibleTierError|no longer supported for Gemini Code Assist", re.I)
 _AUTH = re.compile(r"auth method|not logged in|please (run )?/?login|401 unauthorized"
                    r"|authentication failed|please sign in", re.I)
 
 
 def default_everyone():
-    """Who @wszyscy reaches. Haiku would only duplicate Claude; Gemini needs an API key."""
-    return ["claude", "codex", "antigravity"] + (["gemini"] if os.environ.get("GEMINI_API_KEY") else [])
+    """Who @wszyscy reaches. Haiku would only duplicate Claude."""
+    return ["claude", "codex", "antigravity"]
 
 
 def parse_targets(text, default, everyone=None):
@@ -363,10 +362,7 @@ class _Result:
 
     def error_message(self):
         detail = self.fatal or _summarize_log(self.tail) or f"kod wyjścia {self.returncode}"
-        if _INELIGIBLE.search(detail):
-            detail += ("\n\nGoogle nie obsługuje już darmowego logowania kontem w Gemini CLI. "
-                       "Ten model zadziała z kluczem API (zmienna GEMINI_API_KEY).")
-        elif _AUTH.search(detail):
+        if _AUTH.search(detail):
             detail += "\n\nTo CLI nie jest zalogowane. Kliknij „Instalacja” na górze okna i zaloguj się."
         return detail
 
@@ -439,8 +435,7 @@ class Session:
                 "remote": self._remote.status(),
                 "context_warn": CONTEXT_WARN,
                 "live_sessions": [a for a, s in self.sessions.items() if s.get("id")],
-                "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a)),
-                               "optional": bool(AGENTS[a].get("optional"))}
+                "agents": {a: {"label": AGENTS[a]["label"], "available": bool(self._binaries.get(a))}
                            for a in AGENTS},
             }
 

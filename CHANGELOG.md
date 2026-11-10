@@ -1,9 +1,17 @@
 # Zmiany
 
+## 1.0.25 — 2026-11-10
+- **Gemini usunięty:** agent Gemini CLI, alias `@gemini`, jego domyślne włączanie w `@wszyscy`, parser, wiersz w liście modeli i kolory w statystykach. Darmowe limity Gemini się kończyły. Modele Antigravity o nazwach „gemini-…” zostają, bo to nazwy modeli w Antigravity.
+- Mechanizm „opcjonalnych” modeli (widocznych tylko przy zainstalowanym CLI) zniknął, bo był używany tylko przez Gemini.
+- README przebudowany: spis treści, tabele ustawień i opis zdalnego sterowania zgodne z aktualnym programem.
+
 ## 1.0.24 — 2026-11-10
-- Tekst z załączonych PDF-ów trafia do prompta każdego modelu (w trybie „Tylko czytaj” modele nie otwierają PDF-ów same). Limit znaków ustawiasz w Ustawienia → Modele, domyślnie 30 000, 0 wyłącza.
-- Pomoc i „O programie” są w Ustawieniach jako zakładka. Znak zapytania przy „Nowa rozmowa” otwiera tę zakładkę i pokazuje kropkę, gdy jest nowsza wersja.
-- Pigułka „Pamięć” pokazuje się na górnym pasku podczas aktualizacji pamięci projektu.
+- **Załączniki PDF:** tekst z PDF-a jest wyciągany (biblioteka pypdf) i dokładany do prompta każdego modelu. Dzięki temu w trybie „Tylko czytaj” modele czytają PDF-y, czego wcześniej nie potrafiły. Treść jest ucinana do limitu.
+- **Limit tekstu PDF:** Ustawienia → Modele, pole „Tekst z załączonego PDF-a, najwyżej znaków”. Domyślnie 30 000, zakres 0–500 000. Wartość 0 wyłącza dołączanie tekstu PDF-ów.
+- **O programie w Ustawieniach:** zakładka „O programie” zawiera dane programu, sekcję aktualizacji (sprawdź ponownie, zaktualizuj) i pełny opis działania: folder projektu, czat i @-wzmianki, uprawnienia, debatę, Prompter, pamięć projektu, mapę, statystyki i zdalne sterowanie.
+- **Przycisk „?”:** na górnym pasku, obok „Nowa rozmowa”. Otwiera zakładkę „O programie” w Ustawieniach. Gdy jest nowsza wersja, pokazuje kropkę, a podpowiedź mówi, którą.
+- **Pigułka „Pamięć”:** na górnym pasku pokazuje się podczas aktualizacji pamięci projektu, tak jak pigułki modeli.
+- Animacje pigułek i poświaty wyłączają się przy ustawieniu Windows „Efekty animacji” (ograniczenie ruchu).
 
 ## 1.0.23 — 2026-11-09
 - Ustawienia mają zakładki: Modele, Pamięć, Mapa, Statystyki, Zdalnie i Limity. Mapa, Statystyki

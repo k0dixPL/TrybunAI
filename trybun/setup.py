@@ -108,7 +108,7 @@ def _run_quiet(cmd):
 
 def _open_login_window(cmd, done, poll=3.0):
     """Blocks until the user closes the window or done() says the login landed, keeping logins
-    one at a time. Gemini stays in its chat after a browser login, so it would never exit on its own."""
+    one at a time. A CLI that stays in its chat after a browser login would never exit on its own."""
     proc = subprocess.Popen(cmd, env=_env(), cwd=Path.home(), creationflags=subprocess.CREATE_NEW_CONSOLE)
     while True:
         try:
