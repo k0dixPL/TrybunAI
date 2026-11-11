@@ -70,8 +70,12 @@ header nav a:hover{background:var(--panel);border-color:var(--line);color:var(--
 section{padding:42px 0;border-top:1px solid #ffffff0b}
 h2{font-size:25px;letter-spacing:-.02em;margin:0 0 22px}
 .grid{grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}
-.card{position:relative;background:linear-gradient(145deg,#202329,#1a1c21);border:1px solid #343943;border-top:1px solid #343943;border-radius:10px;padding:18px 19px;transition:transform .18s,border-color .18s,box-shadow .18s}
-.card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--c,var(--line)) 55%,var(--line));box-shadow:0 12px 30px #0003}
+.card{position:relative;background:linear-gradient(145deg,#202329,#1a1c21);border:1px solid #343943;border-top:1px solid #343943;border-radius:10px;padding:18px 19px;transition:border-color .2s,box-shadow .2s}
+.card:nth-child(4n+1){--glow:var(--claude)}.card:nth-child(4n+2){--glow:var(--codex)}
+.card:nth-child(4n+3){--glow:var(--agy)}.card:nth-child(4n){--glow:var(--haiku)}
+@keyframes cardGlow{from{border-color:color-mix(in srgb,var(--glow) 35%,#343943);box-shadow:0 0 8px -3px color-mix(in srgb,var(--glow) 35%,transparent)}
+  to{border-color:color-mix(in srgb,var(--glow) 68%,#343943);box-shadow:0 0 20px -4px color-mix(in srgb,var(--glow) 58%,transparent),0 0 34px -10px color-mix(in srgb,var(--glow) 30%,transparent)}}
+.card:hover{animation:cardGlow 1.8s ease-in-out infinite alternate}
 .card::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;border-radius:10px 0 0 10px;background:var(--c,var(--line));opacity:.85}
 .card h3{font-size:16px}.card p{font-size:14px;line-height:1.65}
 code{color:#d9e2f2;background:#121418;border-color:#343943;font-size:13px}
@@ -84,7 +88,18 @@ ol.steps li::before{counter-increment:steps;content:counter(steps);position:abso
 footer{border-color:var(--line);font-size:13px}
 @media(max-width:800px){.hero-grid{grid-template-columns:1fr;gap:26px;padding:40px 0 30px}.hero{text-align:center}.hero p{margin-left:auto;margin-right:auto}.eyebrow{justify-content:center}.shot{max-width:760px}.wrap{padding:0 20px}}
 @media(max-width:600px){header{flex-wrap:wrap}header nav{display:flex;order:3;width:100%;overflow-x:auto;margin:0;gap:4px}header nav a{white-space:nowrap;padding:6px 9px}.hero-grid{padding-top:32px}.hero h1{font-size:36px}.hero p{font-size:15px}.grid{grid-template-columns:1fr 1fr;gap:9px}.card{padding:15px}.card p{font-size:13px}ol.steps{grid-template-columns:1fr}section{padding:32px 0}}
-@media(max-width:420px){.grid{grid-template-columns:1fr}.wrap{padding:0 15px}}
+@media(max-width:420px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{padding:0 15px}}
+.hero-grid{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;isolation:isolate;margin:44px auto 34px;padding:0;
+  border:1px solid #424854;border-radius:16px;background:#14161a;box-shadow:0 28px 70px #0008,0 0 40px #4fbf8f0c}
+.hero{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;width:39%;height:100%;max-width:440px;min-width:0;padding:34px 0 34px 34px;text-align:left}
+.hero .eyebrow{align-self:flex-start}
+.hero-grid>.shot{position:absolute;z-index:1;inset:0;width:100%;height:100%;margin:0;max-width:none;border:0;border-radius:inherit;box-shadow:none;overflow:hidden;pointer-events:none}
+.hero-grid>.shot img{display:block;width:100%;height:100%;object-fit:cover}
+@media(max-width:760px){.hero-grid{display:flex;flex-direction:column;gap:20px;aspect-ratio:auto;overflow:visible;margin:30px auto;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+  .hero{width:100%;height:auto;max-width:none;align-items:center;padding:0;text-align:center}.hero .eyebrow{align-self:center;justify-content:center}
+  .hero p{margin-left:auto;margin-right:auto}.hero-grid>.shot{position:relative;inset:auto;width:100%;height:auto;aspect-ratio:16/9;border:1px solid #424854;border-radius:12px;box-shadow:0 20px 46px #0007}
+  .hero-grid>.shot img{object-fit:contain}}
+@media(prefers-reduced-motion:reduce){.card{transition:none}.card:hover{animation:none;border-color:color-mix(in srgb,var(--glow) 55%,#343943);box-shadow:0 0 15px -4px color-mix(in srgb,var(--glow) 42%,transparent)}}
 </style>
 </head>
 <body>
@@ -107,7 +122,7 @@ footer{border-color:var(--line);font-size:13px}
     <div class="meta" id="meta">Windows 10/11 · jeden plik, bez instalacji</div>
   </div>
 
-  <div class="shot"><img src="screenshot.png" alt="Okno TrybunAI: debata Claude, Codex i Antigravity, a potem wdrożenie przez Claude" width="1084" height="721"></div>
+  <div class="shot"><img src="hero-ai-team.png" alt="Architekt, programista i księgowy AI wspólnie projektują futurystyczne miasto; poniżej widać siedem osobnych kart funkcji" width="1672" height="941"></div>
 
   </div>
 
