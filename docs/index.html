@@ -71,8 +71,7 @@ section{padding:42px 0;border-top:1px solid #ffffff0b}
 h2{font-size:25px;letter-spacing:-.02em;margin:0 0 22px}
 .grid{grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}
 .card{position:relative;background:linear-gradient(145deg,#202329,#1a1c21);border:1px solid #343943;border-top:1px solid #343943;border-radius:10px;padding:18px 19px;transition:border-color .2s,box-shadow .2s}
-.card:nth-child(4n+1){--glow:var(--claude)}.card:nth-child(4n+2){--glow:var(--codex)}
-.card:nth-child(4n+3){--glow:var(--agy)}.card:nth-child(4n){--glow:var(--haiku)}
+.card{--glow:var(--c,var(--accent))}
 @keyframes cardGlow{from{border-color:color-mix(in srgb,var(--glow) 35%,#343943);box-shadow:0 0 8px -3px color-mix(in srgb,var(--glow) 35%,transparent)}
   to{border-color:color-mix(in srgb,var(--glow) 68%,#343943);box-shadow:0 0 20px -4px color-mix(in srgb,var(--glow) 58%,transparent),0 0 34px -10px color-mix(in srgb,var(--glow) 30%,transparent)}}
 .card:hover{animation:cardGlow 1.8s ease-in-out infinite alternate}
